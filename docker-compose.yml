@@ -11,8 +11,8 @@ services:
       HOSTNAME: 0.0.0.0
     restart: unless-stopped
     networks:
-      - shared_network
+      - saturno_network
 
 networks:
-  shared_network:
+  saturno_network:
     external: true
