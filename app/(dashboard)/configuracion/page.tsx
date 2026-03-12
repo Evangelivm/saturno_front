@@ -163,20 +163,18 @@ export default function ConfiguracionPage() {
             </Button>
 
             <Button
-              variant="outline"
               onClick={() => handleSync('comprobantes')}
               disabled={syncLoading !== null || !esStatus?.available}
-              className="flex items-center gap-2"
+              className="flex items-center gap-2 border bg-card text-foreground hover:bg-muted"
             >
               {syncLoading === 'comprobantes' && <Loader2 className="h-4 w-4 animate-spin" />}
               Solo comprobantes
             </Button>
 
             <Button
-              variant="outline"
               onClick={() => handleSync('legacy')}
               disabled={syncLoading !== null || !esStatus?.available}
-              className="flex items-center gap-2"
+              className="flex items-center gap-2 border bg-card text-foreground hover:bg-muted"
             >
               {syncLoading === 'legacy' && <Loader2 className="h-4 w-4 animate-spin" />}
               Solo historial legacy

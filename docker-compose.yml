@@ -1,0 +1,18 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "3004:3004" # El puerto interno de tu contenedor
+    environment:
+      NODE_ENV: production
+      PORT: 3004
+      HOSTNAME: 0.0.0.0
+    restart: unless-stopped
+    networks:
+      - shared_network
+
+networks:
+  shared_network:
+    external: true

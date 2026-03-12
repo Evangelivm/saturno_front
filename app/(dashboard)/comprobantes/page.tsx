@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import apiClient from '@/lib/api-client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Plus, FileText, CheckCircle, XCircle, ChevronDown, Download, Upload, RotateCcw, Search, X } from 'lucide-react';
+import { Plus, FileText, CheckCircle, XCircle, ChevronDown, Download, Upload, RotateCcw, Search, X, FileSpreadsheet } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/hooks/use-auth';
 
@@ -121,11 +121,31 @@ export default function ComprobantesPage() {
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [downloadingRange, setDownloadingRange] = useState(false);
+  const [downloadRangeBytes, setDownloadRangeBytes] = useState(0);
+  const [downloadLegacyBytes, setDownloadLegacyBytes] = useState(0);
   const [showBatchDialog, setShowBatchDialog] = useState(false);
   const [selectedTypes, setSelectedTypes] = useState<string[]>(['factura', 'xml', 'guia', 'ordenCompra']);
   const [sunatStatus, setSunatStatus] = useState<'up' | 'down' | null>(null);
   const [usuarios, setUsuarios] = useState<{ ruc: string; nombreEmpresa?: string | null }[]>([]);
   const [selectedRuc, setSelectedRuc] = useState('');
+  const [selectedNombre, setSelectedNombre] = useState('');
+  const [batchEmpresaQuery, setBatchEmpresaQuery] = useState('');
+  const [batchSugerencias, setBatchSugerencias] = useState<{ ruc: string; nombre: string }[]>([]);
+  const [batchShowSugerencias, setBatchShowSugerencias] = useState(false);
+  const [includeLegacy, setIncludeLegacy] = useState(false);
+  const [downloadingLegacyBatch, setDownloadingLegacyBatch] = useState(false);
+
+  // reporte
+  const [showReporteDialog, setShowReporteDialog] = useState(false);
+  const [reporteRuc, setReporteRuc] = useState('');
+  const [reporteNombre, setReporteNombre] = useState('');
+  const [reporteDesde, setReporteDesde] = useState('');
+  const [reporteHasta, setReporteHasta] = useState('');
+  const [generandoReporte, setGenerandoReporte] = useState(false);
+  const [empresaQuery, setEmpresaQuery] = useState('');
+  const [empresaSugerencias, setEmpresaSugerencias] = useState<{ ruc: string; nombre: string }[]>([]);
+  const [buscandoEmpresa, setBuscandoEmpresa] = useState(false);
+  const [showSugerencias, setShowSugerencias] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const pendingUploadRef = useRef<{ comprobanteId: string; tipo: string } | null>(null);
@@ -359,16 +379,19 @@ export default function ComprobantesPage() {
 
   const handleDownloadRange = async () => {
     setDownloadingRange(true);
+    setDownloadRangeBytes(0);
     try {
       const response = await apiClient.get('/api/comprobantes/download-range', {
         params: { from: dateFrom, to: dateTo, tipos: selectedTypes.join(','), ...(isAdmin && selectedRuc ? { ruc: selectedRuc } : {}) },
         responseType: 'blob',
+        onDownloadProgress: (e) => setDownloadRangeBytes(e.loaded),
       });
       triggerDownload(response.data, `comprobantes-${dateFrom}-a-${dateTo}.zip`);
     } catch {
       toast.error('No hay archivos en ese rango de fechas');
     } finally {
       setDownloadingRange(false);
+      setDownloadRangeBytes(0);
     }
   };
 
@@ -410,6 +433,12 @@ export default function ComprobantesPage() {
                 <div className={`h-2 w-2 rounded-full ${sunatStatus === 'up' ? 'bg-green-500' : 'bg-red-500 animate-pulse'}`} />
                 {sunatStatus === 'up' ? 'SUNAT disponible' : 'SUNAT no disponible'}
               </div>
+            )}
+            {isAdmin && (
+              <Button onClick={() => setShowReporteDialog(true)} className="flex items-center gap-2 bg-green-600 text-white hover:bg-green-700">
+                <FileSpreadsheet className="h-4 w-4" />
+                Reporte
+              </Button>
             )}
             <Button onClick={() => setShowBatchDialog(true)} className="flex items-center gap-2 border bg-card text-foreground hover:bg-muted">
               <Download className="h-4 w-4" />
@@ -689,8 +718,8 @@ export default function ComprobantesPage() {
               <div className="flex items-center justify-between px-4 py-2.5 border-t bg-muted/20">
                 <span className="text-xs text-muted-foreground">Página {page} de {totalPages} · {stats.total} registros</span>
                 <div className="flex gap-2">
-                  <Button variant="outline" size="sm" onClick={() => setPage(p => p - 1)} disabled={page <= 1 || loading}>Anterior</Button>
-                  <Button variant="outline" size="sm" onClick={() => setPage(p => p + 1)} disabled={page >= totalPages || loading}>Siguiente</Button>
+                  <Button className="h-8 px-3 text-xs border bg-card text-foreground hover:bg-muted" onClick={() => setPage(p => p - 1)} disabled={page <= 1 || loading}>Anterior</Button>
+                  <Button className="h-8 px-3 text-xs border bg-card text-foreground hover:bg-muted" onClick={() => setPage(p => p + 1)} disabled={page >= totalPages || loading}>Siguiente</Button>
                 </div>
               </div>
             )}
@@ -713,11 +742,11 @@ export default function ComprobantesPage() {
               const isExpanded = expandedLegacyId === rec.id;
               const legacyEstado = getLegacyEstadoCp(rec.estadoCp);
               const archivos = [
-                rec.factdoc   && { label: 'Factura',         nombre: rec.factdoc },
-                rec.xmldoc    && { label: 'XML',              nombre: rec.xmldoc },
-                rec.guiadoc   && { label: 'Guía',             nombre: rec.guiadoc },
-                rec.pedidodoc && { label: 'Orden de Compra', nombre: rec.pedidodoc },
-              ].filter(Boolean) as { label: string; nombre: string }[];
+                rec.factdoc   && { label: 'Factura',         nombre: rec.factdoc,  tipo: 'factura' },
+                rec.xmldoc    && { label: 'XML',              nombre: rec.xmldoc,   tipo: 'xml' },
+                rec.guiadoc   && { label: 'Guía',             nombre: rec.guiadoc,  tipo: 'guia' },
+                rec.pedidodoc && { label: 'Orden de Compra', nombre: rec.pedidodoc, tipo: 'pedido' },
+              ].filter(Boolean) as { label: string; nombre: string; tipo: string }[];
 
               return (
                 <div key={rec.id} className="border-b">
@@ -809,16 +838,20 @@ export default function ComprobantesPage() {
                           ) : (
                             <div className="space-y-2">
                               {archivos.map((a) => (
-                                <div key={a.label} className="flex items-center gap-2 bg-amber-100/40 rounded-md px-3 py-2 border border-amber-200/60">
+                                <a
+                                  key={a.label}
+                                  href={`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/api/historial-legacy/${rec.id}/file/${a.tipo}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="flex items-center gap-2 bg-amber-100/40 hover:bg-amber-100 rounded-md px-3 py-2 border border-amber-200/60 hover:border-amber-300 transition-colors cursor-pointer"
+                                >
                                   <span className="text-xs font-semibold px-2 py-0.5 rounded bg-amber-100 text-amber-700 shrink-0">{a.label}</span>
-                                  <span className="text-xs text-muted-foreground truncate">{a.nombre}</span>
-                                </div>
+                                  <span className="text-xs text-muted-foreground truncate flex-1">{a.nombre}</span>
+                                  <Download className="h-3.5 w-3.5 text-amber-500 shrink-0" />
+                                </a>
                               ))}
                             </div>
                           )}
-                          <p className="text-xs text-amber-600 mt-3 italic">
-                            Los archivos del sistema anterior no están disponibles para descarga directa.
-                          </p>
                         </div>
                       </div>
                     </div>
@@ -832,8 +865,8 @@ export default function ComprobantesPage() {
               <div className="flex items-center justify-between px-4 py-2.5 border-t bg-amber-50/40">
                 <span className="text-xs text-amber-700">Historial · Página {legacyPage} de {legacyTotalPages}</span>
                 <div className="flex gap-2">
-                  <Button variant="outline" size="sm" onClick={() => setLegacyPage(p => p - 1)} disabled={legacyPage <= 1 || loadingLegacy}>Anterior</Button>
-                  <Button variant="outline" size="sm" onClick={() => setLegacyPage(p => p + 1)} disabled={legacyPage >= legacyTotalPages || loadingLegacy}>Siguiente</Button>
+                  <Button className="h-8 px-3 text-xs border bg-card text-foreground hover:bg-muted" onClick={() => setLegacyPage(p => p - 1)} disabled={legacyPage <= 1 || loadingLegacy}>Anterior</Button>
+                  <Button className="h-8 px-3 text-xs border bg-card text-foreground hover:bg-muted" onClick={() => setLegacyPage(p => p + 1)} disabled={legacyPage >= legacyTotalPages || loadingLegacy}>Siguiente</Button>
                 </div>
               </div>
             )}
@@ -869,20 +902,58 @@ export default function ComprobantesPage() {
               <div className="border-t border-gray-200 dark:border-gray-700 mb-5" />
 
               {isAdmin && (
-                <div className="mb-4">
+                <div className="mb-4 relative">
                   <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1.5">Empresa</label>
-                  <select
-                    value={selectedRuc}
-                    onChange={(e) => setSelectedRuc(e.target.value)}
-                    className="w-full px-3 py-2.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors"
-                  >
-                    <option value="">Todas las empresas</option>
-                    {usuarios.map((u) => (
-                      <option key={u.ruc} value={u.ruc}>
-                        {u.nombreEmpresa ? `${u.nombreEmpresa} — ${u.ruc}` : u.ruc}
-                      </option>
-                    ))}
-                  </select>
+                  {selectedRuc ? (
+                    <div className="flex items-center justify-between border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-primary/5">
+                      <div>
+                        <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{selectedNombre || selectedRuc}</p>
+                        <p className="text-xs text-gray-500">RUC: {selectedRuc}</p>
+                      </div>
+                      <button onClick={() => { setSelectedRuc(''); setSelectedNombre(''); setBatchEmpresaQuery(''); }} className="text-gray-400 hover:text-gray-600">
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
+                  ) : (
+                    <div>
+                      <input
+                        type="text"
+                        placeholder="Todas las empresas — buscar por nombre o RUC..."
+                        value={batchEmpresaQuery}
+                        onChange={(e) => {
+                          const q = e.target.value;
+                          setBatchEmpresaQuery(q);
+                          setBatchShowSugerencias(true);
+                          if (q.length < 2) { setBatchSugerencias([]); return; }
+                          const lower = q.toLowerCase();
+                          setBatchSugerencias(
+                            usuarios
+                              .filter((u) => u.ruc.includes(lower) || (u.nombreEmpresa ?? '').toLowerCase().includes(lower))
+                              .slice(0, 20)
+                              .map((u) => ({ ruc: u.ruc, nombre: u.nombreEmpresa ?? u.ruc }))
+                          );
+                        }}
+                        onFocus={() => setBatchShowSugerencias(true)}
+                        className="w-full px-3 py-2.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary/30 transition-colors"
+                        autoComplete="off"
+                      />
+                      {batchShowSugerencias && batchSugerencias.length > 0 && (
+                        <div className="absolute z-20 left-0 right-0 mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-md shadow-lg max-h-48 overflow-y-auto">
+                          {batchSugerencias.map((e) => (
+                            <button
+                              key={e.ruc}
+                              type="button"
+                              className="w-full text-left px-3 py-2 hover:bg-primary/5 border-b border-gray-100 dark:border-gray-700 last:border-0"
+                              onClick={() => { setSelectedRuc(e.ruc); setSelectedNombre(e.nombre); setBatchEmpresaQuery(''); setBatchShowSugerencias(false); }}
+                            >
+                              <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">{e.nombre}</p>
+                              <p className="text-xs text-gray-500">RUC: {e.ruc}</p>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -939,19 +1010,75 @@ export default function ComprobantesPage() {
                 </div>
               </div>
 
-              <div className="mt-4 p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg border border-gray-200 dark:border-gray-600">
+              {/* Toggle historial anterior */}
+              <div className="mt-4 flex items-center gap-3 p-3 bg-amber-50 dark:bg-amber-900/20 rounded-lg border border-amber-200 dark:border-amber-700">
+                <input
+                  type="checkbox"
+                  id="includeLegacy"
+                  checked={includeLegacy}
+                  onChange={(e) => setIncludeLegacy(e.target.checked)}
+                  className="h-4 w-4 accent-amber-600 cursor-pointer"
+                />
+                <label htmlFor="includeLegacy" className="text-xs text-amber-800 dark:text-amber-300 font-medium cursor-pointer">
+                  Incluir archivos del historial sistema anterior
+                </label>
+              </div>
+
+              <div className="mt-3 p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg border border-gray-200 dark:border-gray-600">
                 <p className="text-xs text-gray-500 dark:text-gray-400">
                   Se descargará un archivo <span className="font-semibold text-gray-700 dark:text-gray-300">.zip</span> con los tipos seleccionados de los comprobantes dentro del rango, organizados por carpetas.
                 </p>
               </div>
 
-              <div className="flex items-center justify-end gap-2 mt-6">
+              {(downloadingRange || downloadingLegacyBatch) && (
+                <div className="mt-4 space-y-1">
+                  <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400">
+                    <span>{downloadingLegacyBatch ? 'Descargando historial anterior...' : 'Descargando comprobantes...'}</span>
+                    <span>{((downloadingLegacyBatch ? downloadLegacyBytes : downloadRangeBytes) / 1024 / 1024).toFixed(1)} MB</span>
+                  </div>
+                  <div className="w-full h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                    <div className="h-full w-full rounded-full" style={{ background: 'linear-gradient(90deg, hsl(var(--primary)/0.3) 0%, hsl(var(--primary)) 50%, hsl(var(--primary)/0.3) 100%)', backgroundSize: '200% 100%', animation: 'shimmer 1.5s ease-in-out infinite' }} />
+                  </div>
+                </div>
+              )}
+
+              <div className="flex items-center justify-end gap-2 mt-6 flex-wrap">
                 <button
                   onClick={() => setShowBatchDialog(false)}
                   className="text-sm font-medium px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600 active:bg-gray-100 dark:active:bg-gray-600 transition-colors cursor-pointer"
                 >
                   Cancelar
                 </button>
+                {includeLegacy && (
+                  <button
+                    disabled={!dateFrom || !dateTo || dateFrom > dateTo || selectedTypes.length === 0 || downloadingLegacyBatch}
+                    onClick={async () => {
+                      setDownloadingLegacyBatch(true);
+                      setDownloadLegacyBytes(0);
+                      try {
+                        const tiposLegacy = selectedTypes.map(t => t === 'ordenCompra' ? 'pedido' : t).join(',');
+                        const params = new URLSearchParams({ desde: dateFrom, hasta: dateTo, tipos: tiposLegacy });
+                        if (selectedRuc) params.set('ruc', selectedRuc);
+                        const res = await apiClient.get(`/api/reportes/legacy-batch?${params}`, {
+                          responseType: 'blob',
+                          onDownloadProgress: (e) => setDownloadLegacyBytes(e.loaded),
+                        });
+                        triggerDownload(res.data, `historial-${dateFrom}-a-${dateTo}.zip`);
+                      } catch {
+                        toast.error('No hay archivos en ese rango para el historial anterior');
+                      } finally {
+                        setDownloadingLegacyBatch(false);
+                        setDownloadLegacyBytes(0);
+                      }
+                    }}
+                    className="flex items-center gap-2 text-sm font-semibold px-5 py-2 rounded-lg bg-amber-600 text-white hover:bg-amber-700 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed shadow-sm"
+                  >
+                    {downloadingLegacyBatch
+                      ? <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      : <Download className="h-4 w-4" />}
+                    {downloadingLegacyBatch ? 'Descargando...' : 'Historial anterior (.zip)'}
+                  </button>
+                )}
                 <button
                   onClick={handleDownloadRange}
                   disabled={!dateFrom || !dateTo || dateFrom > dateTo || selectedTypes.length === 0 || downloadingRange}
@@ -961,6 +1088,156 @@ export default function ComprobantesPage() {
                     ? <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                     : <Download className="h-4 w-4" />}
                   {downloadingRange ? 'Descargando...' : 'Descargar (.zip)'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* ── Dialog: Reporte Excel ── */}
+      {showReporteDialog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="fixed inset-0 bg-black/40" onClick={() => { setShowReporteDialog(false); setEmpresaQuery(''); setEmpresaSugerencias([]); setShowSugerencias(false); }} />
+          <div className="relative z-10 bg-white text-gray-900 rounded-xl shadow-2xl w-full max-w-md mx-4 overflow-hidden">
+            <div className="h-1.5 bg-green-600" />
+            <div className="p-6">
+              <div className="flex items-start justify-between mb-5">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-green-100 rounded-lg">
+                    <FileSpreadsheet className="h-5 w-5 text-green-700" />
+                  </div>
+                  <div>
+                    <h2 className="text-lg font-semibold">Generar Reporte</h2>
+                    <p className="text-sm text-muted-foreground">Historial sistema anterior</p>
+                  </div>
+                </div>
+                <button onClick={() => setShowReporteDialog(false)} className="text-muted-foreground hover:text-foreground">
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                {/* RUC con autocomplete ES */}
+                <div className="relative">
+                  <label className="text-sm font-medium mb-1.5 block text-gray-700">Empresa</label>
+                  {reporteRuc ? (
+                    <div className="flex items-center justify-between border rounded-md px-3 py-2 bg-green-50 border-green-300">
+                      <div>
+                        <p className="text-sm font-medium text-gray-900">{reporteNombre || reporteRuc}</p>
+                        <p className="text-xs text-gray-500">RUC: {reporteRuc}</p>
+                      </div>
+                      <button onClick={() => { setReporteRuc(''); setReporteNombre(''); setEmpresaQuery(''); }} className="text-gray-400 hover:text-gray-600">
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
+                  ) : (
+                    <div>
+                      <input
+                        type="text"
+                        placeholder="Buscar por nombre o RUC..."
+                        value={empresaQuery}
+                        onChange={(e) => {
+                          const q = e.target.value;
+                          setEmpresaQuery(q);
+                          setShowSugerencias(true);
+                          if (q.length < 2) { setEmpresaSugerencias([]); return; }
+                          const lower = q.toLowerCase();
+                          const filtrados = usuarios
+                            .filter((u) =>
+                              u.ruc.includes(lower) ||
+                              (u.nombreEmpresa ?? '').toLowerCase().includes(lower)
+                            )
+                            .slice(0, 20)
+                            .map((u) => ({ ruc: u.ruc, nombre: u.nombreEmpresa ?? u.ruc }));
+                          setEmpresaSugerencias(filtrados);
+                        }}
+                        onFocus={() => setShowSugerencias(true)}
+                        className="w-full border rounded-md px-3 py-2 text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-green-300"
+                        autoComplete="off"
+                      />
+                      {showSugerencias && empresaSugerencias.length > 0 && (
+                        <div className="absolute z-20 left-0 right-0 mt-1 bg-white border rounded-md shadow-lg max-h-48 overflow-y-auto">
+                          {empresaSugerencias.map((e) => (
+                            <button
+                              key={e.ruc}
+                              type="button"
+                              className="w-full text-left px-3 py-2 hover:bg-green-50 border-b last:border-0"
+                              onClick={() => { setReporteRuc(e.ruc); setReporteNombre(e.nombre); setEmpresaQuery(''); setShowSugerencias(false); }}
+                            >
+                              <p className="text-sm font-medium text-gray-900 truncate">{e.nombre}</p>
+                              <p className="text-xs text-gray-500">RUC: {e.ruc}</p>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Rango de fechas */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Fecha desde</label>
+                    <input
+                      type="date"
+                      value={reporteDesde}
+                      onChange={(e) => setReporteDesde(e.target.value)}
+                      className="w-full px-3 py-2 text-sm border rounded-md text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-green-300"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Fecha hasta</label>
+                    <input
+                      type="date"
+                      value={reporteHasta}
+                      onChange={(e) => setReporteHasta(e.target.value)}
+                      className="w-full px-3 py-2 text-sm border rounded-md text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-green-300"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-6 flex justify-end gap-3">
+                <button
+                  onClick={() => setShowReporteDialog(false)}
+                  className="px-4 py-2 text-sm rounded-md border hover:bg-muted transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  disabled={!reporteRuc || generandoReporte}
+                  onClick={async () => {
+                    if (!reporteRuc) return;
+                    setGenerandoReporte(true);
+                    try {
+                      const params = new URLSearchParams({ ruc: reporteRuc });
+                      if (reporteDesde) params.set('desde', reporteDesde);
+                      if (reporteHasta) params.set('hasta', reporteHasta);
+
+                      const res = await apiClient.get(`/api/reportes/legacy?${params}`, { responseType: 'blob' });
+                      const url = URL.createObjectURL(res.data);
+                      const a = document.createElement('a');
+                      a.href = url;
+                      const hoy = new Date();
+                      const dd = String(hoy.getDate()).padStart(2, '0');
+                      const mm = String(hoy.getMonth() + 1).padStart(2, '0');
+                      const yyyy = hoy.getFullYear();
+                      const nombreSafe = (reporteNombre || reporteRuc).replace(/[^a-zA-Z0-9áéíóúÁÉÍÓÚñÑ\s]/g, '').trim().replace(/\s+/g, '_');
+                      a.download = `reporte_${nombreSafe}_${dd}-${mm}-${yyyy}.xlsx`;
+                      a.click();
+                      URL.revokeObjectURL(url);
+                      setShowReporteDialog(false);
+                      toast.success('Reporte generado correctamente');
+                    } catch {
+                      toast.error('Error al generar el reporte');
+                    } finally {
+                      setGenerandoReporte(false);
+                    }
+                  }}
+                  className="px-4 py-2 text-sm rounded-md bg-green-600 text-white hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+                >
+                  <FileSpreadsheet className="h-4 w-4" />
+                  {generandoReporte ? 'Generando...' : 'Descargar Excel'}
                 </button>
               </div>
             </div>

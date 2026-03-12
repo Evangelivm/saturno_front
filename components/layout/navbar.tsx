@@ -137,9 +137,7 @@ export function Navbar() {
 
             <Button
               onClick={handleLogout}
-              variant="outline"
-              size="sm"
-              className="flex items-center space-x-2"
+              className="flex items-center space-x-2 h-8 px-3 text-sm border bg-card text-foreground hover:bg-muted"
             >
               <LogOut className="h-4 w-4" />
               <span className="hidden sm:inline">Cerrar Sesión</span>

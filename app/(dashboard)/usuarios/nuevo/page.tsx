@@ -110,7 +110,7 @@ export default function NuevoUsuarioPage() {
           </CardContent>
 
           <CardFooter className="flex justify-between">
-            <Button type="button" variant="outline" onClick={() => router.push('/usuarios')}>
+            <Button type="button" className="border bg-card text-foreground hover:bg-muted" onClick={() => router.push('/usuarios')}>
               Cancelar
             </Button>
             <Button type="submit" disabled={loading}>
