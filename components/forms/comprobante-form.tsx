@@ -78,7 +78,7 @@ export function ComprobanteForm({ onSuccess }: ComprobanteFormProps) {
   };
 
   return (
-    <Card>
+    <Card id="tour-form">
       <CardHeader>
         <CardTitle>Validar Comprobante</CardTitle>
       </CardHeader>
@@ -214,7 +214,7 @@ export function ComprobanteForm({ onSuccess }: ComprobanteFormProps) {
             </div>
           </div>
 
-          <Button type="submit" className="w-full" disabled={loading}>
+          <Button id="tour-btn-validar" type="submit" className="w-full" disabled={loading}>
             {loading ? 'Validando...' : 'Validar Comprobante'}
           </Button>
         </form>

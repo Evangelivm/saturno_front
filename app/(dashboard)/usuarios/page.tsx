@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/use-auth';
 import { Button } from '@/components/ui/button';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { UserPlus, Trash2, RotateCcw, Check, X } from 'lucide-react';
 import apiClient from '@/lib/api-client';
 
@@ -15,6 +15,39 @@ interface UsuarioItem {
   role: string;
   isActive: boolean;
   createdAt: string;
+}
+
+function Actions({ u, isOwn, isLoading, confirmDeleteId, setConfirmDeleteId, handleDelete, handleResetPassword }: {
+  u: UsuarioItem;
+  isOwn: boolean;
+  isLoading: boolean;
+  confirmDeleteId: string | null;
+  setConfirmDeleteId: (id: string | null) => void;
+  handleDelete: (id: string) => void;
+  handleResetPassword: (id: string) => void;
+}) {
+  if (isOwn) return <span className="text-xs text-muted-foreground">Cuenta propia</span>;
+  if (confirmDeleteId === u.id) return (
+    <div className="flex items-center gap-1">
+      <span className="text-xs text-red-600 font-medium mr-1">¿Seguro?</span>
+      <button onClick={() => handleDelete(u.id)} disabled={isLoading} className="p-1 text-red-600 hover:text-red-800 disabled:opacity-50">
+        <Check className="h-4 w-4" />
+      </button>
+      <button onClick={() => setConfirmDeleteId(null)} className="p-1 text-muted-foreground hover:text-foreground">
+        <X className="h-4 w-4" />
+      </button>
+    </div>
+  );
+  return (
+    <div className="flex items-center gap-1">
+      <button onClick={() => handleResetPassword(u.id)} disabled={isLoading} className="p-1.5 rounded text-muted-foreground hover:text-foreground hover:bg-muted disabled:opacity-50" title="Resetear contraseña">
+        <RotateCcw className="h-4 w-4" />
+      </button>
+      <button onClick={() => setConfirmDeleteId(u.id)} disabled={isLoading} className="p-1.5 rounded text-muted-foreground hover:text-red-600 hover:bg-red-50 disabled:opacity-50" title="Eliminar usuario">
+        <Trash2 className="h-4 w-4" />
+      </button>
+    </div>
+  );
 }
 
 export default function UsuariosPage() {
@@ -83,12 +116,12 @@ export default function UsuariosPage() {
   }
 
   return (
-    <div className="max-w-5xl mx-auto px-4 py-8">
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold">Usuarios</h1>
-        <Button onClick={() => router.push('/usuarios/nuevo')} className="flex items-center gap-2">
+    <div className="max-w-5xl mx-auto px-3 sm:px-4 py-5 sm:py-8">
+      <div className="flex items-center justify-between mb-5 sm:mb-6">
+        <h1 className="text-xl sm:text-2xl font-bold">Usuarios</h1>
+        <Button onClick={() => router.push('/usuarios/nuevo')} className="flex items-center gap-2 h-8 sm:h-9 text-xs sm:text-sm px-3 sm:px-4">
           <UserPlus className="h-4 w-4" />
-          Nuevo Usuario
+          <span>Nuevo Usuario</span>
         </Button>
       </div>
 
@@ -103,99 +136,77 @@ export default function UsuariosPage() {
           {usuarios.length === 0 ? (
             <p className="text-center text-muted-foreground py-8">No hay usuarios registrados</p>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b">
-                    <th className="text-left font-medium text-muted-foreground py-3 px-2">RUC</th>
-                    <th className="text-left font-medium text-muted-foreground py-3 px-2">Empresa</th>
-                    <th className="text-left font-medium text-muted-foreground py-3 px-2">Rol</th>
-                    <th className="text-left font-medium text-muted-foreground py-3 px-2">Estado</th>
-                    <th className="text-left font-medium text-muted-foreground py-3 px-2">Fecha Creación</th>
-                    <th className="text-left font-medium text-muted-foreground py-3 px-2">Acciones</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {usuarios.map((u) => {
-                    const isOwn = u.id === user?.id;
-                    const isLoading = actionLoading === u.id;
+            <>
+              {/* Vista desktop — tabla */}
+              <div className="hidden md:block overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b">
+                      <th className="text-left font-medium text-muted-foreground py-3 px-2">RUC</th>
+                      <th className="text-left font-medium text-muted-foreground py-3 px-2">Empresa</th>
+                      <th className="text-left font-medium text-muted-foreground py-3 px-2">Rol</th>
+                      <th className="text-left font-medium text-muted-foreground py-3 px-2">Estado</th>
+                      <th className="text-left font-medium text-muted-foreground py-3 px-2">Fecha Creación</th>
+                      <th className="text-left font-medium text-muted-foreground py-3 px-2">Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {usuarios.map((u) => {
+                      const isOwn = u.id === user?.id;
+                      const isLoading = actionLoading === u.id;
+                      return (
+                        <tr key={u.id} className="border-b last:border-0">
+                          <td className="py-3 px-2 font-mono">{u.ruc}</td>
+                          <td className="py-3 px-2">{u.nombreEmpresa || '—'}</td>
+                          <td className="py-3 px-2">
+                            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${u.role === 'ADMIN' ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-700'}`}>
+                              {u.role === 'ADMIN' ? 'Administrador' : 'Usuario'}
+                            </span>
+                          </td>
+                          <td className="py-3 px-2">
+                            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${u.isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                              {u.isActive ? 'Activo' : 'Inactivo'}
+                            </span>
+                          </td>
+                          <td className="py-3 px-2 text-muted-foreground">{new Date(u.createdAt).toLocaleDateString('es-PE')}</td>
+                          <td className="py-3 px-2">
+                            <Actions u={u} isOwn={isOwn} isLoading={isLoading} confirmDeleteId={confirmDeleteId} setConfirmDeleteId={setConfirmDeleteId} handleDelete={handleDelete} handleResetPassword={handleResetPassword} />
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
 
-                    return (
-                      <tr key={u.id} className="border-b last:border-0">
-                        <td className="py-3 px-2 font-mono">{u.ruc}</td>
-                        <td className="py-3 px-2">{u.nombreEmpresa || '—'}</td>
-                        <td className="py-3 px-2">
-                          <span
-                            className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
-                              u.role === 'ADMIN'
-                                ? 'bg-blue-100 text-blue-800'
-                                : 'bg-gray-100 text-gray-700'
-                            }`}
-                          >
-                            {u.role === 'ADMIN' ? 'Administrador' : 'Usuario'}
-                          </span>
-                        </td>
-                        <td className="py-3 px-2">
-                          <span
-                            className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
-                              u.isActive
-                                ? 'bg-green-100 text-green-800'
-                                : 'bg-red-100 text-red-800'
-                            }`}
-                          >
-                            {u.isActive ? 'Activo' : 'Inactivo'}
-                          </span>
-                        </td>
-                        <td className="py-3 px-2 text-muted-foreground">
-                          {new Date(u.createdAt).toLocaleDateString('es-PE')}
-                        </td>
-                        <td className="py-3 px-2">
-                          {isOwn ? (
-                            <span className="text-xs text-muted-foreground">Cuenta propia</span>
-                          ) : confirmDeleteId === u.id ? (
-                            <div className="flex items-center gap-1">
-                              <span className="text-xs text-red-600 font-medium mr-1">¿Seguro?</span>
-                              <button
-                                onClick={() => handleDelete(u.id)}
-                                disabled={isLoading}
-                                className="p-1 text-red-600 hover:text-red-800 disabled:opacity-50"
-                              >
-                                <Check className="h-4 w-4" />
-                              </button>
-                              <button
-                                onClick={() => setConfirmDeleteId(null)}
-                                className="p-1 text-muted-foreground hover:text-foreground"
-                              >
-                                <X className="h-4 w-4" />
-                              </button>
-                            </div>
-                          ) : (
-                            <div className="flex items-center gap-1">
-                              <button
-                                onClick={() => handleResetPassword(u.id)}
-                                disabled={isLoading}
-                                className="p-1.5 rounded text-muted-foreground hover:text-foreground hover:bg-muted disabled:opacity-50"
-                                title="Resetear contraseña"
-                              >
-                                <RotateCcw className="h-4 w-4" />
-                              </button>
-                              <button
-                                onClick={() => setConfirmDeleteId(u.id)}
-                                disabled={isLoading}
-                                className="p-1.5 rounded text-muted-foreground hover:text-red-600 hover:bg-red-50 disabled:opacity-50"
-                                title="Eliminar usuario"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </button>
-                            </div>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+              {/* Vista móvil — tarjetas */}
+              <div className="md:hidden divide-y divide-border">
+                {usuarios.map((u) => {
+                  const isOwn = u.id === user?.id;
+                  const isLoading = actionLoading === u.id;
+                  return (
+                    <div key={u.id} className="py-4 space-y-2">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="font-medium text-sm truncate">{u.nombreEmpresa || '—'}</p>
+                          <p className="text-xs font-mono text-muted-foreground">{u.ruc}</p>
+                        </div>
+                        <Actions u={u} isOwn={isOwn} isLoading={isLoading} confirmDeleteId={confirmDeleteId} setConfirmDeleteId={setConfirmDeleteId} handleDelete={handleDelete} handleResetPassword={handleResetPassword} />
+                      </div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${u.role === 'ADMIN' ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-700'}`}>
+                          {u.role === 'ADMIN' ? 'Administrador' : 'Usuario'}
+                        </span>
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${u.isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                          {u.isActive ? 'Activo' : 'Inactivo'}
+                        </span>
+                        <span className="text-xs text-muted-foreground">{new Date(u.createdAt).toLocaleDateString('es-PE')}</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </>
           )}
         </CardContent>
       </Card>

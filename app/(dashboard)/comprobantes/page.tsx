@@ -5,9 +5,10 @@ import { useRouter } from 'next/navigation';
 import apiClient from '@/lib/api-client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Plus, FileText, CheckCircle, XCircle, ChevronDown, Download, Upload, RotateCcw, Search, X, FileSpreadsheet } from 'lucide-react';
+import { Plus, FileText, CheckCircle, XCircle, ChevronDown, Download, Upload, RotateCcw, Search, X, FileSpreadsheet, HelpCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/hooks/use-auth';
+import { useComprobantesTour } from '@/hooks/use-comprobantes-tour';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // SUNAT code maps  (Anexo del manual v2.0)
@@ -92,6 +93,7 @@ export default function ComprobantesPage() {
   const { user: currentUser } = useAuth();
   const isAdmin = currentUser?.role === 'ADMIN';
   const router = useRouter();
+  const { startTour } = useComprobantesTour(isAdmin);
 
   const initialLoadDone = useRef(false);
   const abortRef = useRef<AbortController | null>(null);
@@ -122,7 +124,6 @@ export default function ComprobantesPage() {
   const [dateTo, setDateTo] = useState('');
   const [downloadingRange, setDownloadingRange] = useState(false);
   const [downloadRangeBytes, setDownloadRangeBytes] = useState(0);
-  const [downloadLegacyBytes, setDownloadLegacyBytes] = useState(0);
   const [showBatchDialog, setShowBatchDialog] = useState(false);
   const [selectedTypes, setSelectedTypes] = useState<string[]>(['factura', 'xml', 'guia', 'ordenCompra']);
   const [sunatStatus, setSunatStatus] = useState<'up' | 'down' | null>(null);
@@ -133,7 +134,6 @@ export default function ComprobantesPage() {
   const [batchSugerencias, setBatchSugerencias] = useState<{ ruc: string; nombre: string }[]>([]);
   const [batchShowSugerencias, setBatchShowSugerencias] = useState(false);
   const [includeLegacy, setIncludeLegacy] = useState(false);
-  const [downloadingLegacyBatch, setDownloadingLegacyBatch] = useState(false);
 
   // reporte
   const [showReporteDialog, setShowReporteDialog] = useState(false);
@@ -415,17 +415,17 @@ export default function ComprobantesPage() {
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
-    <div className="p-6">
+    <div className="p-3 sm:p-6">
       <input ref={fileInputRef} type="file" className="hidden" onChange={handleUpload} />
-      <div className="max-w-7xl mx-auto space-y-6">
+      <div className="max-w-7xl mx-auto space-y-4 sm:space-y-6">
 
         {/* ── Header ── */}
-        <div className="flex justify-between items-center">
+        <div id="tour-header" className="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-start">
           <div>
-            <h1 className="text-3xl font-bold mb-2">Comprobantes</h1>
-            <p className="text-muted-foreground">Gestiona y consulta todos tus comprobantes validados con SUNAT</p>
+            <h1 className="text-2xl sm:text-3xl font-bold mb-1 sm:mb-2">Comprobantes</h1>
+            <p className="text-sm text-muted-foreground">Gestiona y consulta todos tus comprobantes validados con SUNAT</p>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3 sm:shrink-0">
             {sunatStatus !== null && (
               <div className={`flex items-center gap-1.5 px-3 py-1 rounded-full border text-xs font-medium ${
                 sunatStatus === 'up' ? 'bg-green-50 border-green-200 text-green-700' : 'bg-red-50 border-red-200 text-red-700'
@@ -435,24 +435,24 @@ export default function ComprobantesPage() {
               </div>
             )}
             {isAdmin && (
-              <Button onClick={() => setShowReporteDialog(true)} className="flex items-center gap-2 bg-green-600 text-white hover:bg-green-700">
+              <Button id="tour-btn-reporte" onClick={() => setShowReporteDialog(true)} className="flex items-center gap-2 bg-green-600 text-white hover:bg-green-700 text-xs sm:text-sm h-8 sm:h-9 px-3 sm:px-4">
                 <FileSpreadsheet className="h-4 w-4" />
-                Reporte
+                <span>Reporte</span>
               </Button>
             )}
-            <Button onClick={() => setShowBatchDialog(true)} className="flex items-center gap-2 border bg-card text-foreground hover:bg-muted">
+            <Button id="tour-btn-lote" onClick={() => setShowBatchDialog(true)} className="flex items-center gap-2 border bg-card text-foreground hover:bg-muted text-xs sm:text-sm h-8 sm:h-9 px-3 sm:px-4">
               <Download className="h-4 w-4" />
-              Descarga de lote
+              <span>Descarga de lote</span>
             </Button>
-            <Button onClick={() => router.push('/comprobantes/nuevo')} className="flex items-center gap-2">
+            <Button id="tour-btn-nuevo" onClick={() => router.push('/comprobantes/nuevo')} className="flex items-center gap-2 text-xs sm:text-sm h-8 sm:h-9 px-3 sm:px-4">
               <Plus className="h-4 w-4" />
-              Nuevo Comprobante
+              <span>Nuevo Comprobante</span>
             </Button>
           </div>
         </div>
 
         {/* ── Stats ── */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div id="tour-stats" className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Total Comprobantes</CardTitle>
@@ -483,7 +483,7 @@ export default function ComprobantesPage() {
         </div>
 
         {/* ── Search ── */}
-        <Card>
+        <Card id="tour-search">
           <CardContent className="pt-4 pb-4">
             <div className="relative">
               {loading && initialLoadDone.current ? (
@@ -504,6 +504,7 @@ export default function ComprobantesPage() {
 
         {/* ── Unified table ── */}
         {!hasContent ? (
+
           <Card>
             <CardContent className="flex flex-col items-center justify-center py-12">
               <FileText className="h-12 w-12 text-muted-foreground mb-4" />
@@ -516,7 +517,7 @@ export default function ComprobantesPage() {
             </CardContent>
           </Card>
         ) : (
-          <Card>
+          <Card id="tour-table">
             {/* Shared header */}
             <div className={`hidden md:grid ${gridCols} items-center gap-3 px-4 py-3 border-b bg-muted/40`}>
               <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Comprobante</span>
@@ -876,11 +877,11 @@ export default function ComprobantesPage() {
 
       {/* ── Dialog: Descarga de lote ── */}
       {showBatchDialog && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
           <div className="fixed inset-0 bg-black/40" onClick={() => setShowBatchDialog(false)} />
-          <div className="relative z-10 bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-md mx-4 overflow-hidden">
+          <div className="relative z-10 bg-white dark:bg-gray-800 rounded-t-xl sm:rounded-xl shadow-2xl w-full sm:max-w-md sm:mx-4 overflow-hidden max-h-[90vh] overflow-y-auto">
             <div className="h-1.5 bg-primary" />
-            <div className="p-6">
+            <div className="p-4 sm:p-6">
               <div className="flex items-start justify-between mb-4">
                 <div className="flex items-center gap-3">
                   <div className="p-2 bg-primary/10 rounded-lg">
@@ -1030,11 +1031,11 @@ export default function ComprobantesPage() {
                 </p>
               </div>
 
-              {(downloadingRange || downloadingLegacyBatch) && (
+              {downloadingRange && (
                 <div className="mt-4 space-y-1">
                   <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400">
-                    <span>{downloadingLegacyBatch ? 'Descargando historial anterior...' : 'Descargando comprobantes...'}</span>
-                    <span>{((downloadingLegacyBatch ? downloadLegacyBytes : downloadRangeBytes) / 1024 / 1024).toFixed(1)} MB</span>
+                    <span>Descargando comprobantes...</span>
+                    <span>{(downloadRangeBytes / 1024 / 1024).toFixed(1)} MB</span>
                   </div>
                   <div className="w-full h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
                     <div className="h-full w-full rounded-full" style={{ background: 'linear-gradient(90deg, hsl(var(--primary)/0.3) 0%, hsl(var(--primary)) 50%, hsl(var(--primary)/0.3) 100%)', backgroundSize: '200% 100%', animation: 'shimmer 1.5s ease-in-out infinite' }} />
@@ -1042,47 +1043,38 @@ export default function ComprobantesPage() {
                 </div>
               )}
 
-              <div className="flex items-center justify-end gap-2 mt-6 flex-wrap">
+              <div className="flex flex-col-reverse sm:flex-row sm:items-center sm:justify-end gap-2 mt-6">
                 <button
                   onClick={() => setShowBatchDialog(false)}
-                  className="text-sm font-medium px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600 active:bg-gray-100 dark:active:bg-gray-600 transition-colors cursor-pointer"
+                  className="w-full sm:w-auto text-sm font-medium px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600 active:bg-gray-100 dark:active:bg-gray-600 transition-colors cursor-pointer"
                 >
                   Cancelar
                 </button>
                 {includeLegacy && (
                   <button
-                    disabled={!dateFrom || !dateTo || dateFrom > dateTo || selectedTypes.length === 0 || downloadingLegacyBatch}
-                    onClick={async () => {
-                      setDownloadingLegacyBatch(true);
-                      setDownloadLegacyBytes(0);
-                      try {
-                        const tiposLegacy = selectedTypes.map(t => t === 'ordenCompra' ? 'pedido' : t).join(',');
-                        const params = new URLSearchParams({ desde: dateFrom, hasta: dateTo, tipos: tiposLegacy });
-                        if (selectedRuc) params.set('ruc', selectedRuc);
-                        const res = await apiClient.get(`/api/reportes/legacy-batch?${params}`, {
-                          responseType: 'blob',
-                          onDownloadProgress: (e) => setDownloadLegacyBytes(e.loaded),
-                        });
-                        triggerDownload(res.data, `historial-${dateFrom}-a-${dateTo}.zip`);
-                      } catch {
-                        toast.error('No hay archivos en ese rango para el historial anterior');
-                      } finally {
-                        setDownloadingLegacyBatch(false);
-                        setDownloadLegacyBytes(0);
-                      }
+                    disabled={!dateFrom || !dateTo || dateFrom > dateTo || selectedTypes.length === 0}
+                    onClick={() => {
+                      const tiposLegacy = selectedTypes.map(t => t === 'ordenCompra' ? 'pedido' : t).join(',');
+                      const params = new URLSearchParams({ desde: dateFrom, hasta: dateTo, tipos: tiposLegacy });
+                      if (selectedRuc) params.set('ruc', selectedRuc);
+                      const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+                      const a = document.createElement('a');
+                      a.href = `${apiBase}/api/reportes/legacy-batch?${params}`;
+                      a.download = `historial-${dateFrom}-a-${dateTo}.zip`;
+                      document.body.appendChild(a);
+                      a.click();
+                      document.body.removeChild(a);
                     }}
-                    className="flex items-center gap-2 text-sm font-semibold px-5 py-2 rounded-lg bg-amber-600 text-white hover:bg-amber-700 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed shadow-sm"
+                    className="w-full sm:w-auto flex items-center justify-center gap-2 text-sm font-semibold px-5 py-2 rounded-lg bg-amber-600 text-white hover:bg-amber-700 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed shadow-sm"
                   >
-                    {downloadingLegacyBatch
-                      ? <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                      : <Download className="h-4 w-4" />}
-                    {downloadingLegacyBatch ? 'Descargando...' : 'Historial anterior (.zip)'}
+                    <Download className="h-4 w-4" />
+                    Historial anterior (.zip)
                   </button>
                 )}
                 <button
                   onClick={handleDownloadRange}
                   disabled={!dateFrom || !dateTo || dateFrom > dateTo || selectedTypes.length === 0 || downloadingRange}
-                  className="flex items-center gap-2 text-sm font-semibold px-5 py-2 rounded-lg bg-primary text-white hover:bg-primary/90 active:bg-primary/80 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed shadow-sm"
+                  className="w-full sm:w-auto flex items-center justify-center gap-2 text-sm font-semibold px-5 py-2 rounded-lg bg-primary text-white hover:bg-primary/90 active:bg-primary/80 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed shadow-sm"
                 >
                   {downloadingRange
                     ? <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
@@ -1096,11 +1088,11 @@ export default function ComprobantesPage() {
       )}
       {/* ── Dialog: Reporte Excel ── */}
       {showReporteDialog && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
           <div className="fixed inset-0 bg-black/40" onClick={() => { setShowReporteDialog(false); setEmpresaQuery(''); setEmpresaSugerencias([]); setShowSugerencias(false); }} />
-          <div className="relative z-10 bg-white text-gray-900 rounded-xl shadow-2xl w-full max-w-md mx-4 overflow-hidden">
+          <div className="relative z-10 bg-white text-gray-900 rounded-t-xl sm:rounded-xl shadow-2xl w-full sm:max-w-md sm:mx-4 overflow-hidden max-h-[90vh] overflow-y-auto">
             <div className="h-1.5 bg-green-600" />
-            <div className="p-6">
+            <div className="p-4 sm:p-6">
               <div className="flex items-start justify-between mb-5">
                 <div className="flex items-center gap-3">
                   <div className="p-2 bg-green-100 rounded-lg">
@@ -1197,10 +1189,10 @@ export default function ComprobantesPage() {
                 </div>
               </div>
 
-              <div className="mt-6 flex justify-end gap-3">
+              <div className="mt-6 flex flex-col-reverse sm:flex-row sm:justify-end gap-2 sm:gap-3">
                 <button
                   onClick={() => setShowReporteDialog(false)}
-                  className="px-4 py-2 text-sm rounded-md border hover:bg-muted transition-colors"
+                  className="w-full sm:w-auto px-4 py-2 text-sm rounded-md border hover:bg-muted transition-colors"
                 >
                   Cancelar
                 </button>
@@ -1234,7 +1226,7 @@ export default function ComprobantesPage() {
                       setGenerandoReporte(false);
                     }
                   }}
-                  className="px-4 py-2 text-sm rounded-md bg-green-600 text-white hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+                  className="w-full sm:w-auto px-4 py-2 text-sm rounded-md bg-green-600 text-white hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
                 >
                   <FileSpreadsheet className="h-4 w-4" />
                   {generandoReporte ? 'Generando...' : 'Descargar Excel'}
@@ -1244,6 +1236,17 @@ export default function ComprobantesPage() {
           </div>
         </div>
       )}
+
+      {/* ── Botón flotante de ayuda ── */}
+      <button
+        id="tour-help-btn"
+        onClick={startTour}
+        title="Ver tutorial"
+        className="fixed bottom-6 right-6 z-40 flex items-center gap-2 bg-primary text-primary-foreground shadow-lg rounded-full px-4 py-2.5 text-sm font-medium hover:bg-primary/90 transition-all hover:scale-105 active:scale-95"
+      >
+        <HelpCircle className="h-4 w-4" />
+        <span className="hidden sm:inline">Tutorial</span>
+      </button>
     </div>
   );
 }

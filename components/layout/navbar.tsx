@@ -5,12 +5,14 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/use-auth';
 import { Button } from '@/components/ui/button';
-import { LogOut, FileText, Plus, Users, UserPlus, Settings } from 'lucide-react';
+import { LogOut, FileText, Plus, Users, UserPlus, Settings, Menu, X } from 'lucide-react';
+import { useState } from 'react';
 
 export function Navbar() {
   const pathname = usePathname();
   const router = useRouter();
   const { user, logout } = useAuth();
+  const [mobileOpen, setMobileOpen] = useState(false);
 
   const handleLogout = async () => {
     try {
@@ -123,7 +125,7 @@ export function Navbar() {
           </div>
 
           {/* Usuario y logout */}
-          <div className="flex items-center space-x-4">
+          <div className="flex items-center space-x-2 sm:space-x-4">
             {user && (
               <div className="hidden sm:flex flex-col items-end">
                 <span className="text-sm font-medium text-foreground">
@@ -137,65 +139,98 @@ export function Navbar() {
 
             <Button
               onClick={handleLogout}
-              className="flex items-center space-x-2 h-8 px-3 text-sm border bg-card text-foreground hover:bg-muted"
+              className="hidden sm:flex items-center space-x-2 h-8 px-3 text-sm border bg-card text-foreground hover:bg-muted"
             >
               <LogOut className="h-4 w-4" />
-              <span className="hidden sm:inline">Cerrar Sesión</span>
+              <span>Cerrar Sesión</span>
             </Button>
+
+            {/* Hamburger button — solo visible en móvil */}
+            <button
+              onClick={() => setMobileOpen((o) => !o)}
+              className="md:hidden p-2 rounded-md text-foreground hover:bg-muted transition-colors"
+              aria-label="Abrir menú"
+            >
+              {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+            </button>
           </div>
         </div>
 
-        {/* Mobile navigation */}
-        <div className="md:hidden pb-3 space-y-1">
-          {navLinks.map((link) => {
-            const Icon = link.icon;
-            const isActive = pathname === link.href || pathname.startsWith(link.href + '/');
+        {/* Mobile navigation — colapsable */}
+        {mobileOpen && (
+          <div className="md:hidden pb-3 pt-1 space-y-1 border-t border-border mt-1">
+            {navLinks.map((link) => {
+              const Icon = link.icon;
+              const isActive = pathname === link.href || pathname.startsWith(link.href + '/');
 
-            return (
-              <Link
-                key={link.href}
-                href={link.href}
-                className={`
-                  flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium transition-colors
-                  ${isActive
-                    ? 'bg-primary text-primary-foreground'
-                    : 'text-foreground hover:bg-muted'
-                  }
-                `}
-              >
-                <Icon className="h-4 w-4" />
-                <span>{link.label}</span>
-              </Link>
-            );
-          })}
+              return (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  onClick={() => setMobileOpen(false)}
+                  className={`
+                    flex items-center space-x-2 px-3 py-2.5 rounded-md text-sm font-medium transition-colors
+                    ${isActive
+                      ? 'bg-primary text-primary-foreground'
+                      : 'text-foreground hover:bg-muted'
+                    }
+                  `}
+                >
+                  <Icon className="h-4 w-4" />
+                  <span>{link.label}</span>
+                </Link>
+              );
+            })}
 
-          {user?.role === 'ADMIN' && (
-            <>
-              <div className="h-px bg-border my-2" />
-              {adminNavLinks.map((link) => {
-                const Icon = link.icon;
-                const isActive = pathname === link.href || pathname.startsWith(link.href + '/');
+            {user?.role === 'ADMIN' && (
+              <>
+                <div className="h-px bg-border my-1" />
+                {adminNavLinks.map((link) => {
+                  const Icon = link.icon;
+                  const isActive = pathname === link.href || pathname.startsWith(link.href + '/');
 
-                return (
-                  <Link
-                    key={link.href}
-                    href={link.href}
-                    className={`
-                      flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium transition-colors
-                      ${isActive
-                        ? 'bg-primary text-primary-foreground'
-                        : 'text-foreground hover:bg-muted'
-                      }
-                    `}
+                  return (
+                    <Link
+                      key={link.href}
+                      href={link.href}
+                      onClick={() => setMobileOpen(false)}
+                      className={`
+                        flex items-center space-x-2 px-3 py-2.5 rounded-md text-sm font-medium transition-colors
+                        ${isActive
+                          ? 'bg-primary text-primary-foreground'
+                          : 'text-foreground hover:bg-muted'
+                        }
+                      `}
+                    >
+                      <Icon className="h-4 w-4" />
+                      <span>{link.label}</span>
+                    </Link>
+                  );
+                })}
+              </>
+            )}
+
+            {/* Info usuario + cerrar sesión en móvil */}
+            {user && (
+              <>
+                <div className="h-px bg-border my-1" />
+                <div className="px-3 py-2 flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-foreground">{user.nombreEmpresa || 'Empresa'}</p>
+                    <p className="text-xs text-muted-foreground">RUC: {user.ruc}</p>
+                  </div>
+                  <button
+                    onClick={() => { setMobileOpen(false); handleLogout(); }}
+                    className="flex items-center gap-1.5 text-sm text-red-600 hover:text-red-700 font-medium px-2 py-1.5 rounded-md hover:bg-red-50 transition-colors"
                   >
-                    <Icon className="h-4 w-4" />
-                    <span>{link.label}</span>
-                  </Link>
-                );
-              })}
-            </>
-          )}
-        </div>
+                    <LogOut className="h-4 w-4" />
+                    Cerrar sesión
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        )}
       </div>
     </nav>
   );

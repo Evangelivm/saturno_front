@@ -68,7 +68,7 @@ export function UploadSection({
   };
 
   return (
-    <Card>
+    <Card id="tour-upload">
       <CardHeader>
         <CardTitle>Subir Archivos del Comprobante</CardTitle>
         <p className="text-sm text-gray-600">
