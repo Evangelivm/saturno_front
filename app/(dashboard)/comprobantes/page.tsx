@@ -55,6 +55,8 @@ interface Comprobante {
   guiaFileName: string | null;
   ordenCompraFileId: string | null;
   ordenCompraFileName: string | null;
+  contabilidadValidado: boolean;
+  contabilidadValidadoAt: string | null;
   user?: { ruc: string };
 }
 
@@ -121,6 +123,7 @@ export default function ComprobantesPage() {
   const [uploadingKey, setUploadingKey] = useState<string | null>(null);
   const [downloadingKey, setDownloadingKey] = useState<string | null>(null);
   const [revalidatingId, setRevalidatingId] = useState<string | null>(null);
+  const [validatingContabilidadId, setValidatingContabilidadId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
@@ -376,6 +379,24 @@ export default function ComprobantesPage() {
       toast.error('Error al revalidar comprobante');
     } finally {
       setRevalidatingId(null);
+    }
+  };
+
+  const handleToggleContabilidad = async (comprobanteId: string) => {
+    setValidatingContabilidadId(comprobanteId);
+    try {
+      const response = await apiClient.put(`/api/comprobantes/${comprobanteId}/contabilidad`);
+      const { contabilidadValidado, contabilidadValidadoAt } = response.data;
+
+      setComprobantes(prev => prev.map(c =>
+        c.id === comprobanteId ? { ...c, contabilidadValidado, contabilidadValidadoAt } : c
+      ));
+
+      toast.success(contabilidadValidado ? 'Marcado como validado por Contabilidad' : 'Validación de Contabilidad removida');
+    } catch {
+      toast.error('Error al actualizar la validación de Contabilidad');
+    } finally {
+      setValidatingContabilidadId(null);
     }
   };
 
@@ -743,6 +764,39 @@ export default function ComprobantesPage() {
                               ))}
                             </div>
                           </div>
+                        </div>
+                        <div className="mt-4 pt-4 border-t flex items-center justify-between gap-3 flex-wrap">
+                          <div className="flex items-center gap-2">
+                            {comprobante.contabilidadValidado ? (
+                              <>
+                                <CheckCircle className="h-4 w-4 text-success shrink-0" />
+                                <span className="text-sm font-medium text-success">
+                                  Validado por Contabilidad
+                                  {comprobante.contabilidadValidadoAt && (
+                                    <span className="font-normal text-muted-foreground"> · {formatDate(comprobante.contabilidadValidadoAt)}</span>
+                                  )}
+                                </span>
+                              </>
+                            ) : (
+                              <span className="text-sm text-muted-foreground">Pendiente de validación por Contabilidad</span>
+                            )}
+                          </div>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); handleToggleContabilidad(comprobante.id); }}
+                            disabled={validatingContabilidadId === comprobante.id}
+                            className={`flex items-center gap-1.5 text-xs font-medium rounded-md px-2.5 py-1 transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer ${
+                              comprobante.contabilidadValidado
+                                ? 'text-muted-foreground border border-border hover:bg-muted'
+                                : 'text-success border border-success/30 hover:bg-success/10 active:bg-success/20'
+                            }`}
+                          >
+                            {validatingContabilidadId === comprobante.id
+                              ? <div className="h-3.5 w-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                              : <CheckCircle className="h-3.5 w-3.5" />}
+                            {validatingContabilidadId === comprobante.id
+                              ? 'Guardando...'
+                              : comprobante.contabilidadValidado ? 'Desmarcar validación' : 'Marcar validado por Contabilidad'}
+                          </button>
                         </div>
                       </div>
                     )}
