@@ -174,7 +174,7 @@ export default function ComprobantesPage() {
     : 'md:grid-cols-[2.5fr_1fr_1fr_1fr_1fr_auto]';
 
   // ── Effects ────────────────────────────────────────────────────────────────
-  useEffect(() => { fetchLegacyRecords(legacyPage, debouncedSearch); }, [legacyPage, debouncedSearch]);
+  useEffect(() => { fetchLegacyRecords(legacyPage, debouncedSearch); }, [legacyPage, debouncedSearch, sortBy, sortOrder]);
 
   useEffect(() => {
     const t = setTimeout(() => { setDebouncedSearch(searchTerm); setPage(1); setLegacyPage(1); }, 200);
@@ -235,6 +235,7 @@ export default function ComprobantesPage() {
       setSortOrder('desc');
     }
     setPage(1);
+    setLegacyPage(1);
   };
 
   const SortHeader = ({ column, label }: { column: string; label: string }) => {
@@ -259,6 +260,7 @@ export default function ComprobantesPage() {
     try {
       const params: Record<string, string> = { page: String(pageNum), limit: '30' };
       if (search) params.search = search;
+      if (sortBy) { params.sortBy = sortBy; params.sortOrder = sortOrder; }
       const response = await apiClient.get('/api/historial-legacy', { params, signal: abortLegacyRef.current.signal });
       const { data, totalPages: tp } = response.data;
       setLegacyRecords(data);

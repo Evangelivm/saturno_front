@@ -22,6 +22,7 @@ export function ComprobanteForm({ onSuccess }: ComprobanteFormProps) {
     numero: 0,
     fechaEmision: '',
     condicionPago: 'CONTADO',
+    credito: undefined,
     tipoFactura: 'VENTA',
     numeroOrden: '',
     monto: undefined,
@@ -184,6 +185,24 @@ export function ComprobanteForm({ onSuccess }: ComprobanteFormProps) {
                 <option value="CREDITO">Crédito</option>
               </Select>
               {errors.condicionPago && <p className="text-sm text-red-600">{errors.condicionPago}</p>}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="credito">Crédito</Label>
+              <Select
+                id="credito"
+                name="credito"
+                value={formData.credito ?? ''}
+                onChange={handleChange}
+              >
+                <option value="">Seleccione</option>
+                <option value="7">7 días</option>
+                <option value="15">15 días</option>
+                <option value="30">30 días</option>
+                <option value="45">45 días</option>
+                <option value="90">90 días</option>
+              </Select>
+              {errors.credito && <p className="text-sm text-red-600">{errors.credito}</p>}
             </div>
 
             <div className="space-y-2">

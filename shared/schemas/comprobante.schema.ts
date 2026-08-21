@@ -6,6 +6,9 @@ export const TipoComprobanteEnum = z.enum(['01', '03', '04', '07', '08', 'R1', '
 // Condición de pago
 export const CondicionPagoEnum = z.enum(['CONTADO', 'CREDITO']);
 
+// Días de crédito
+export const CreditoEnum = z.enum(['7', '15', '30', '45', '90']);
+
 // Tipo de factura (solo para base de datos, no se envía a SUNAT)
 export const TipoFacturaEnum = z.enum([
   'REPARACION_RECONSTRUCCION',
@@ -37,6 +40,8 @@ export const ComprobanteFormSchema = z.object({
     .regex(/^\d{2}\/\d{2}\/\d{4}$/, 'Formato debe ser DD/MM/YYYY'),
 
   condicionPago: CondicionPagoEnum,
+
+  credito: CreditoEnum.optional(),
 
   tipoFactura: TipoFacturaEnum,
 
