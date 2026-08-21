@@ -126,7 +126,7 @@ export default function UsuariosPage() {
       </div>
 
       {error && (
-        <div className="p-3 mb-4 text-sm text-red-600 bg-red-50 rounded-md">
+        <div className="p-3 mb-4 text-sm text-red-700 bg-red-50 border border-red-200 rounded-md font-medium">
           {error}
         </div>
       )}

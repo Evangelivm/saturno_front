@@ -71,7 +71,7 @@ export function UploadSection({
     <Card id="tour-upload">
       <CardHeader>
         <CardTitle>Subir Archivos del Comprobante</CardTitle>
-        <p className="text-sm text-gray-600">
+        <p className="text-sm text-muted-foreground">
           Arrastra y suelta los archivos en las zonas correspondientes
         </p>
       </CardHeader>

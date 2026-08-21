@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import apiClient from '@/lib/api-client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Plus, FileText, CheckCircle, XCircle, ChevronDown, Download, Upload, RotateCcw, Search, X, FileSpreadsheet, HelpCircle } from 'lucide-react';
+import { Plus, FileText, CheckCircle, XCircle, ChevronDown, Download, Upload, RotateCcw, Search, X, FileSpreadsheet, HelpCircle, ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/hooks/use-auth';
 import { useComprobantesTour } from '@/hooks/use-comprobantes-tour';
@@ -106,6 +106,8 @@ export default function ComprobantesPage() {
   const [totalPages, setTotalPages] = useState(1);
   const [stats, setStats] = useState({ total: 0, validados: 0, rechazados: 0 });
   const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [sortBy, setSortBy] = useState<string | null>(null);
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
 
   // legacy
   const [legacyRecords, setLegacyRecords] = useState<LegacyRecord[]>([]);
@@ -176,7 +178,7 @@ export default function ComprobantesPage() {
     return () => clearTimeout(t);
   }, [searchTerm]);
 
-  useEffect(() => { fetchComprobantes(page, debouncedSearch); }, [page, debouncedSearch]);
+  useEffect(() => { fetchComprobantes(page, debouncedSearch); }, [page, debouncedSearch, sortBy, sortOrder]);
 
   useEffect(() => {
     if (!isAdmin) return;
@@ -203,6 +205,7 @@ export default function ComprobantesPage() {
     try {
       const params: Record<string, string> = { page: String(pageNum), limit: '30' };
       if (search) params.search = search;
+      if (sortBy) { params.sortBy = sortBy; params.sortOrder = sortOrder; }
       const response = await apiClient.get('/api/comprobantes', { params, signal: abortRef.current.signal });
       const { data, totalPages: tp, stats: s } = response.data;
       setComprobantes(data);
@@ -216,6 +219,34 @@ export default function ComprobantesPage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleSort = (column: string) => {
+    if (sortBy !== column) {
+      setSortBy(column);
+      setSortOrder('asc');
+    } else if (sortOrder === 'asc') {
+      setSortOrder('desc');
+    } else {
+      setSortBy(null);
+      setSortOrder('desc');
+    }
+    setPage(1);
+  };
+
+  const SortHeader = ({ column, label }: { column: string; label: string }) => {
+    const active = sortBy === column;
+    const Icon = active ? (sortOrder === 'asc' ? ArrowUp : ArrowDown) : ArrowUpDown;
+    return (
+      <button
+        type="button"
+        onClick={() => handleSort(column)}
+        className={`flex items-center gap-1 text-xs font-semibold uppercase tracking-wide transition-colors cursor-pointer ${active ? 'text-brand' : 'text-muted-foreground hover:text-foreground'}`}
+      >
+        {label}
+        <Icon className={`h-3 w-3 ${active ? '' : 'opacity-40'}`} />
+      </button>
+    );
   };
 
   const fetchLegacyRecords = async (pageNum: number, search?: string) => {
@@ -402,7 +433,7 @@ export default function ComprobantesPage() {
         <div className="max-w-7xl mx-auto">
           <div className="flex items-center justify-center h-64">
             <div className="text-center">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand mx-auto mb-4"></div>
               <p className="text-muted-foreground">Cargando comprobantes...</p>
             </div>
           </div>
@@ -435,16 +466,16 @@ export default function ComprobantesPage() {
               </div>
             )}
             {isAdmin && (
-              <Button id="tour-btn-reporte" onClick={() => setShowReporteDialog(true)} className="flex items-center gap-2 bg-green-600 text-white hover:bg-green-700 text-xs sm:text-sm h-8 sm:h-9 px-3 sm:px-4">
+              <Button id="tour-btn-reporte" onClick={() => setShowReporteDialog(true)} variant="success" size="sm" className="text-xs sm:text-sm">
                 <FileSpreadsheet className="h-4 w-4" />
                 <span>Reporte</span>
               </Button>
             )}
-            <Button id="tour-btn-lote" onClick={() => setShowBatchDialog(true)} className="flex items-center gap-2 border bg-card text-foreground hover:bg-muted text-xs sm:text-sm h-8 sm:h-9 px-3 sm:px-4">
+            <Button id="tour-btn-lote" onClick={() => setShowBatchDialog(true)} variant="outline" size="sm" className="text-xs sm:text-sm">
               <Download className="h-4 w-4" />
               <span>Descarga de lote</span>
             </Button>
-            <Button id="tour-btn-nuevo" onClick={() => router.push('/comprobantes/nuevo')} className="flex items-center gap-2 text-xs sm:text-sm h-8 sm:h-9 px-3 sm:px-4">
+            <Button id="tour-btn-nuevo" onClick={() => router.push('/comprobantes/nuevo')} size="sm" className="text-xs sm:text-sm">
               <Plus className="h-4 w-4" />
               <span>Nuevo Comprobante</span>
             </Button>
@@ -453,31 +484,37 @@ export default function ComprobantesPage() {
 
         {/* ── Stats ── */}
         <div id="tour-stats" className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Card>
+          <Card className="border-t-2 border-t-primary">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Comprobantes</CardTitle>
-              <FileText className="h-4 w-4 text-muted-foreground" />
+              <CardTitle className="text-sm font-medium text-muted-foreground">Total Comprobantes</CardTitle>
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
+                <FileText className="h-4 w-4 text-primary" />
+              </div>
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{stats.total}</div>
             </CardContent>
           </Card>
-          <Card>
+          <Card className="border-t-2 border-t-success">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Validados</CardTitle>
-              <CheckCircle className="h-4 w-4 text-green-600" />
+              <CardTitle className="text-sm font-medium text-muted-foreground">Validados</CardTitle>
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-success/10">
+                <CheckCircle className="h-4 w-4 text-success" />
+              </div>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-green-600">{stats.validados}</div>
+              <div className="text-2xl font-bold text-success">{stats.validados}</div>
             </CardContent>
           </Card>
-          <Card>
+          <Card className="border-t-2 border-t-destructive">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Rechazados</CardTitle>
-              <XCircle className="h-4 w-4 text-red-600" />
+              <CardTitle className="text-sm font-medium text-muted-foreground">Rechazados</CardTitle>
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-destructive/10">
+                <XCircle className="h-4 w-4 text-destructive" />
+              </div>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-red-600">{stats.rechazados}</div>
+              <div className="text-2xl font-bold text-destructive">{stats.rechazados}</div>
             </CardContent>
           </Card>
         </div>
@@ -487,7 +524,7 @@ export default function ComprobantesPage() {
           <CardContent className="pt-4 pb-4">
             <div className="relative">
               {loading && initialLoadDone.current ? (
-                <div className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 border-2 border-primary border-t-transparent rounded-full animate-spin pointer-events-none" />
+                <div className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 border-2 border-brand border-t-transparent rounded-full animate-spin pointer-events-none" />
               ) : (
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
               )}
@@ -496,7 +533,7 @@ export default function ComprobantesPage() {
                 placeholder="Buscar por serie, RUC, código o estado..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-9 pr-3 py-2 text-sm border rounded-md bg-card focus:outline-none focus:ring-2 focus:ring-primary/20"
+                className="w-full pl-9 pr-3 py-2 text-sm border rounded-md bg-card focus:outline-none focus:ring-2 focus:ring-brand/20"
               />
             </div>
           </CardContent>
@@ -520,11 +557,11 @@ export default function ComprobantesPage() {
           <Card id="tour-table">
             {/* Shared header */}
             <div className={`hidden md:grid ${gridCols} items-center gap-3 px-4 py-3 border-b bg-muted/40`}>
-              <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Comprobante</span>
-              {isAdmin && <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Empresa</span>}
-              <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Estado</span>
-              <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Monto</span>
-              <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Fecha</span>
+              <SortHeader column="numero" label="Comprobante" />
+              {isAdmin && <SortHeader column="empresa" label="Empresa" />}
+              <SortHeader column="estado" label="Estado" />
+              <SortHeader column="monto" label="Monto" />
+              <SortHeader column="fecha" label="Fecha" />
               <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Archivos</span>
               <span className="w-5" />
             </div>
@@ -554,7 +591,7 @@ export default function ComprobantesPage() {
                       {/* Desktop */}
                       <div className={`hidden md:grid ${gridCols} items-center gap-3 px-4 py-3.5 hover:bg-muted/30 transition-colors`}>
                         <div className="flex items-center gap-2 min-w-0">
-                          <FileText className="h-4 w-4 text-primary shrink-0" />
+                          <FileText className="h-4 w-4 text-brand shrink-0" />
                           <div className="min-w-0">
                             <p className="font-medium text-sm truncate">{comprobante.numeroSerie}-{comprobante.numero}</p>
                             <p className="text-xs text-muted-foreground">Código: {comprobante.codigoAlfanumerico}</p>
@@ -577,7 +614,7 @@ export default function ComprobantesPage() {
                       {/* Mobile */}
                       <div className="flex md:hidden items-center justify-between px-4 py-3.5 hover:bg-muted/30 transition-colors">
                         <div className="flex items-center gap-3 min-w-0">
-                          <FileText className="h-4 w-4 text-primary shrink-0" />
+                          <FileText className="h-4 w-4 text-brand shrink-0" />
                           <div className="min-w-0">
                             <p className="font-medium text-sm truncate">{comprobante.numeroSerie}-{comprobante.numero}</p>
                             <div className="flex items-center gap-2 mt-0.5">
@@ -631,7 +668,7 @@ export default function ComprobantesPage() {
                             <button
                               onClick={(e) => { e.stopPropagation(); handleRevalidate(comprobante.id); }}
                               disabled={revalidatingId === comprobante.id}
-                              className="mt-3 flex items-center gap-1.5 text-xs font-medium text-primary border border-primary/30 rounded-md px-2.5 py-1 hover:bg-primary/10 active:bg-primary/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                              className="mt-3 flex items-center gap-1.5 text-xs font-medium text-brand border border-brand/30 rounded-md px-2.5 py-1 hover:bg-brand/10 active:bg-brand/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                             >
                               <RotateCcw className={`h-3.5 w-3.5 ${revalidatingId === comprobante.id ? 'animate-spin' : ''}`} />
                               {revalidatingId === comprobante.id ? 'Revalidando...' : 'Revalidar con SUNAT'}
@@ -644,7 +681,7 @@ export default function ComprobantesPage() {
                                 <button
                                   onClick={(e) => { e.stopPropagation(); handleDownloadAll(comprobante.id, comprobante.codigoAlfanumerico); }}
                                   disabled={downloadingKey === `${comprobante.id}-all`}
-                                  className="flex items-center gap-1 text-xs font-medium text-primary border border-primary/30 rounded-md px-2.5 py-1 hover:bg-primary/10 active:bg-primary/20 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                                  className="flex items-center gap-1 text-xs font-medium text-brand border border-brand/30 rounded-md px-2.5 py-1 hover:bg-brand/10 active:bg-brand/20 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
                                   {downloadingKey === `${comprobante.id}-all`
                                     ? <div className="h-3 w-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
@@ -662,7 +699,7 @@ export default function ComprobantesPage() {
                                       href={`https://drive.google.com/file/d/${file.fileId}/view`}
                                       target="_blank"
                                       rel="noopener noreferrer"
-                                      className="text-xs text-muted-foreground truncate hover:text-primary transition-colors"
+                                      className="text-xs text-muted-foreground truncate hover:text-brand transition-colors"
                                     >
                                       {file.fileName}
                                     </a>
@@ -696,7 +733,7 @@ export default function ComprobantesPage() {
                                   key={tipo}
                                   onClick={(e) => { e.stopPropagation(); triggerUpload(comprobante.id, tipo); }}
                                   disabled={uploadingKey === `${comprobante.id}-${tipo}`}
-                                  className="w-full flex items-center justify-center gap-1.5 border border-dashed rounded-md px-3 py-2 text-xs text-muted-foreground hover:text-primary hover:border-primary hover:bg-primary/5 active:bg-primary/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                                  className="w-full flex items-center justify-center gap-1.5 border border-dashed rounded-md px-3 py-2 text-xs text-muted-foreground hover:text-brand hover:border-brand hover:bg-brand/5 active:bg-brand/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                                 >
                                   {uploadingKey === `${comprobante.id}-${tipo}`
                                     ? <div className="h-3 w-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
@@ -719,8 +756,8 @@ export default function ComprobantesPage() {
               <div className="flex items-center justify-between px-4 py-2.5 border-t bg-muted/20">
                 <span className="text-xs text-muted-foreground">Página {page} de {totalPages} · {stats.total} registros</span>
                 <div className="flex gap-2">
-                  <Button className="h-8 px-3 text-xs border bg-card text-foreground hover:bg-muted" onClick={() => setPage(p => p - 1)} disabled={page <= 1 || loading}>Anterior</Button>
-                  <Button className="h-8 px-3 text-xs border bg-card text-foreground hover:bg-muted" onClick={() => setPage(p => p + 1)} disabled={page >= totalPages || loading}>Siguiente</Button>
+                  <Button variant="outline" size="sm" onClick={() => setPage(p => p - 1)} disabled={page <= 1 || loading}>Anterior</Button>
+                  <Button variant="outline" size="sm" onClick={() => setPage(p => p + 1)} disabled={page >= totalPages || loading}>Siguiente</Button>
                 </div>
               </div>
             )}
@@ -866,8 +903,8 @@ export default function ComprobantesPage() {
               <div className="flex items-center justify-between px-4 py-2.5 border-t bg-amber-50/40">
                 <span className="text-xs text-amber-700">Historial · Página {legacyPage} de {legacyTotalPages}</span>
                 <div className="flex gap-2">
-                  <Button className="h-8 px-3 text-xs border bg-card text-foreground hover:bg-muted" onClick={() => setLegacyPage(p => p - 1)} disabled={legacyPage <= 1 || loadingLegacy}>Anterior</Button>
-                  <Button className="h-8 px-3 text-xs border bg-card text-foreground hover:bg-muted" onClick={() => setLegacyPage(p => p + 1)} disabled={legacyPage >= legacyTotalPages || loadingLegacy}>Siguiente</Button>
+                  <Button variant="outline" size="sm" onClick={() => setLegacyPage(p => p - 1)} disabled={legacyPage <= 1 || loadingLegacy}>Anterior</Button>
+                  <Button variant="outline" size="sm" onClick={() => setLegacyPage(p => p + 1)} disabled={legacyPage >= legacyTotalPages || loadingLegacy}>Siguiente</Button>
                 </div>
               </div>
             )}
@@ -1038,20 +1075,22 @@ export default function ComprobantesPage() {
                     <span>{(downloadRangeBytes / 1024 / 1024).toFixed(1)} MB</span>
                   </div>
                   <div className="w-full h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
-                    <div className="h-full w-full rounded-full" style={{ background: 'linear-gradient(90deg, hsl(var(--primary)/0.3) 0%, hsl(var(--primary)) 50%, hsl(var(--primary)/0.3) 100%)', backgroundSize: '200% 100%', animation: 'shimmer 1.5s ease-in-out infinite' }} />
+                    <div className="h-full w-full rounded-full" style={{ background: 'linear-gradient(90deg, hsl(var(--brand)/0.3) 0%, hsl(var(--brand)) 50%, hsl(var(--brand)/0.3) 100%)', backgroundSize: '200% 100%', animation: 'shimmer 1.5s ease-in-out infinite' }} />
                   </div>
                 </div>
               )}
 
               <div className="flex flex-col-reverse sm:flex-row sm:items-center sm:justify-end gap-2 mt-6">
-                <button
+                <Button
+                  variant="outline"
                   onClick={() => setShowBatchDialog(false)}
-                  className="w-full sm:w-auto text-sm font-medium px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600 active:bg-gray-100 dark:active:bg-gray-600 transition-colors cursor-pointer"
+                  className="w-full sm:w-auto"
                 >
                   Cancelar
-                </button>
+                </Button>
                 {includeLegacy && (
-                  <button
+                  <Button
+                    variant="warning"
                     disabled={!dateFrom || !dateTo || dateFrom > dateTo || selectedTypes.length === 0}
                     onClick={() => {
                       const tiposLegacy = selectedTypes.map(t => t === 'ordenCompra' ? 'pedido' : t).join(',');
@@ -1065,22 +1104,22 @@ export default function ComprobantesPage() {
                       a.click();
                       document.body.removeChild(a);
                     }}
-                    className="w-full sm:w-auto flex items-center justify-center gap-2 text-sm font-semibold px-5 py-2 rounded-lg bg-amber-600 text-white hover:bg-amber-700 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed shadow-sm"
+                    className="w-full sm:w-auto"
                   >
                     <Download className="h-4 w-4" />
                     Historial anterior (.zip)
-                  </button>
+                  </Button>
                 )}
-                <button
+                <Button
                   onClick={handleDownloadRange}
                   disabled={!dateFrom || !dateTo || dateFrom > dateTo || selectedTypes.length === 0 || downloadingRange}
-                  className="w-full sm:w-auto flex items-center justify-center gap-2 text-sm font-semibold px-5 py-2 rounded-lg bg-primary text-white hover:bg-primary/90 active:bg-primary/80 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed shadow-sm"
+                  className="w-full sm:w-auto"
                 >
                   {downloadingRange
                     ? <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                     : <Download className="h-4 w-4" />}
                   {downloadingRange ? 'Descargando...' : 'Descargar (.zip)'}
-                </button>
+                </Button>
               </div>
             </div>
           </div>
@@ -1091,12 +1130,12 @@ export default function ComprobantesPage() {
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
           <div className="fixed inset-0 bg-black/40" onClick={() => { setShowReporteDialog(false); setEmpresaQuery(''); setEmpresaSugerencias([]); setShowSugerencias(false); }} />
           <div className="relative z-10 bg-white text-gray-900 rounded-t-xl sm:rounded-xl shadow-2xl w-full sm:max-w-md sm:mx-4 overflow-hidden max-h-[90vh] overflow-y-auto">
-            <div className="h-1.5 bg-green-600" />
+            <div className="h-1.5 bg-success" />
             <div className="p-4 sm:p-6">
               <div className="flex items-start justify-between mb-5">
                 <div className="flex items-center gap-3">
-                  <div className="p-2 bg-green-100 rounded-lg">
-                    <FileSpreadsheet className="h-5 w-5 text-green-700" />
+                  <div className="p-2 bg-success/10 rounded-lg">
+                    <FileSpreadsheet className="h-5 w-5 text-success" />
                   </div>
                   <div>
                     <h2 className="text-lg font-semibold">Generar Reporte</h2>
@@ -1113,7 +1152,7 @@ export default function ComprobantesPage() {
                 <div className="relative">
                   <label className="text-sm font-medium mb-1.5 block text-gray-700">Empresa</label>
                   {reporteRuc ? (
-                    <div className="flex items-center justify-between border rounded-md px-3 py-2 bg-green-50 border-green-300">
+                    <div className="flex items-center justify-between border rounded-md px-3 py-2 bg-success/5 border-success/30">
                       <div>
                         <p className="text-sm font-medium text-gray-900">{reporteNombre || reporteRuc}</p>
                         <p className="text-xs text-gray-500">RUC: {reporteRuc}</p>
@@ -1144,7 +1183,7 @@ export default function ComprobantesPage() {
                           setEmpresaSugerencias(filtrados);
                         }}
                         onFocus={() => setShowSugerencias(true)}
-                        className="w-full border rounded-md px-3 py-2 text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-green-300"
+                        className="w-full border rounded-md px-3 py-2 text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-ring"
                         autoComplete="off"
                       />
                       {showSugerencias && empresaSugerencias.length > 0 && (
@@ -1153,7 +1192,7 @@ export default function ComprobantesPage() {
                             <button
                               key={e.ruc}
                               type="button"
-                              className="w-full text-left px-3 py-2 hover:bg-green-50 border-b last:border-0"
+                              className="w-full text-left px-3 py-2 hover:bg-success/10 border-b last:border-0"
                               onClick={() => { setReporteRuc(e.ruc); setReporteNombre(e.nombre); setEmpresaQuery(''); setShowSugerencias(false); }}
                             >
                               <p className="text-sm font-medium text-gray-900 truncate">{e.nombre}</p>
@@ -1174,7 +1213,7 @@ export default function ComprobantesPage() {
                       type="date"
                       value={reporteDesde}
                       onChange={(e) => setReporteDesde(e.target.value)}
-                      className="w-full px-3 py-2 text-sm border rounded-md text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-green-300"
+                      className="w-full px-3 py-2 text-sm border rounded-md text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-ring"
                     />
                   </div>
                   <div>
@@ -1183,20 +1222,22 @@ export default function ComprobantesPage() {
                       type="date"
                       value={reporteHasta}
                       onChange={(e) => setReporteHasta(e.target.value)}
-                      className="w-full px-3 py-2 text-sm border rounded-md text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-green-300"
+                      className="w-full px-3 py-2 text-sm border rounded-md text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-ring"
                     />
                   </div>
                 </div>
               </div>
 
               <div className="mt-6 flex flex-col-reverse sm:flex-row sm:justify-end gap-2 sm:gap-3">
-                <button
+                <Button
+                  variant="outline"
                   onClick={() => setShowReporteDialog(false)}
-                  className="w-full sm:w-auto px-4 py-2 text-sm rounded-md border hover:bg-muted transition-colors"
+                  className="w-full sm:w-auto"
                 >
                   Cancelar
-                </button>
-                <button
+                </Button>
+                <Button
+                  variant="success"
                   disabled={!reporteRuc || generandoReporte}
                   onClick={async () => {
                     if (!reporteRuc) return;
@@ -1226,11 +1267,11 @@ export default function ComprobantesPage() {
                       setGenerandoReporte(false);
                     }
                   }}
-                  className="w-full sm:w-auto px-4 py-2 text-sm rounded-md bg-green-600 text-white hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
+                  className="w-full sm:w-auto"
                 >
                   <FileSpreadsheet className="h-4 w-4" />
                   {generandoReporte ? 'Generando...' : 'Descargar Excel'}
-                </button>
+                </Button>
               </div>
             </div>
           </div>
@@ -1242,7 +1283,7 @@ export default function ComprobantesPage() {
         id="tour-help-btn"
         onClick={startTour}
         title="Ver tutorial"
-        className="fixed bottom-6 right-6 z-40 flex items-center gap-2 bg-primary text-primary-foreground shadow-lg rounded-full px-4 py-2.5 text-sm font-medium hover:bg-primary/90 transition-all hover:scale-105 active:scale-95"
+        className="fixed bottom-6 right-6 z-40 flex items-center gap-2 bg-brand text-brand-foreground shadow-lg rounded-full px-4 py-2.5 text-sm font-medium hover:bg-brand/90 transition-all hover:scale-105 active:scale-95"
       >
         <HelpCircle className="h-4 w-4" />
         <span className="hidden sm:inline">Tutorial</span>

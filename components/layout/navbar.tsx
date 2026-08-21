@@ -55,7 +55,7 @@ export function Navbar() {
   ];
 
   return (
-    <nav className="bg-white border-b border-border shadow-sm">
+    <nav className="sticky top-0 z-30 bg-card/95 backdrop-blur border-b border-border shadow-sm">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           {/* Logo y nombre */}
@@ -85,8 +85,8 @@ export function Navbar() {
                   className={`
                     flex items-center space-x-2 px-4 py-2 rounded-md text-sm font-medium transition-colors
                     ${isActive
-                      ? 'bg-primary text-primary-foreground'
-                      : 'text-foreground hover:bg-muted hover:text-foreground'
+                      ? 'bg-secondary text-secondary-foreground'
+                      : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
                     }
                   `}
                 >
@@ -110,8 +110,8 @@ export function Navbar() {
                       className={`
                         flex items-center space-x-2 px-4 py-2 rounded-md text-sm font-medium transition-colors
                         ${isActive
-                          ? 'bg-primary text-primary-foreground'
-                          : 'text-foreground hover:bg-muted hover:text-foreground'
+                          ? 'bg-secondary text-secondary-foreground'
+                          : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
                         }
                       `}
                     >
@@ -139,7 +139,9 @@ export function Navbar() {
 
             <Button
               onClick={handleLogout}
-              className="hidden sm:flex items-center space-x-2 h-8 px-3 text-sm border bg-card text-foreground hover:bg-muted"
+              variant="outline"
+              size="sm"
+              className="hidden sm:flex items-center space-x-2 hover:text-destructive hover:border-destructive/40"
             >
               <LogOut className="h-4 w-4" />
               <span>Cerrar Sesión</span>
@@ -148,7 +150,7 @@ export function Navbar() {
             {/* Hamburger button — solo visible en móvil */}
             <button
               onClick={() => setMobileOpen((o) => !o)}
-              className="md:hidden p-2 rounded-md text-foreground hover:bg-muted transition-colors"
+              className="md:hidden p-2 rounded-md text-foreground hover:bg-accent hover:text-accent-foreground transition-colors cursor-pointer"
               aria-label="Abrir menú"
             >
               {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
@@ -171,8 +173,8 @@ export function Navbar() {
                   className={`
                     flex items-center space-x-2 px-3 py-2.5 rounded-md text-sm font-medium transition-colors
                     ${isActive
-                      ? 'bg-primary text-primary-foreground'
-                      : 'text-foreground hover:bg-muted'
+                      ? 'bg-secondary text-secondary-foreground'
+                      : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
                     }
                   `}
                 >
@@ -197,8 +199,8 @@ export function Navbar() {
                       className={`
                         flex items-center space-x-2 px-3 py-2.5 rounded-md text-sm font-medium transition-colors
                         ${isActive
-                          ? 'bg-primary text-primary-foreground'
-                          : 'text-foreground hover:bg-muted'
+                          ? 'bg-secondary text-secondary-foreground'
+                          : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
                         }
                       `}
                     >

@@ -165,7 +165,8 @@ export default function ConfiguracionPage() {
             <Button
               onClick={() => handleSync('comprobantes')}
               disabled={syncLoading !== null || !esStatus?.available}
-              className="flex items-center gap-2 border bg-card text-foreground hover:bg-muted"
+              variant="outline"
+              className="flex items-center gap-2"
             >
               {syncLoading === 'comprobantes' && <Loader2 className="h-4 w-4 animate-spin" />}
               Solo comprobantes
@@ -174,7 +175,8 @@ export default function ConfiguracionPage() {
             <Button
               onClick={() => handleSync('legacy')}
               disabled={syncLoading !== null || !esStatus?.available}
-              className="flex items-center gap-2 border bg-card text-foreground hover:bg-muted"
+              variant="outline"
+              className="flex items-center gap-2"
             >
               {syncLoading === 'legacy' && <Loader2 className="h-4 w-4 animate-spin" />}
               Solo historial legacy

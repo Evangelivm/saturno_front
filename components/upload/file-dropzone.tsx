@@ -21,23 +21,27 @@ export function FileDropzone({ label, accept, onDrop, uploaded }: FileDropzonePr
     <div
       {...getRootProps()}
       className={`
-        border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors
-        ${isDragActive ? 'border-blue-500 bg-blue-50' : 'border-gray-300 hover:border-gray-400'}
-        ${uploaded ? 'border-green-500 bg-green-50' : ''}
+        border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-all duration-150
+        ${isDragActive ? 'border-brand bg-brand/5 scale-[1.02] shadow-md' : 'border-border bg-muted/40 hover:border-brand/50 hover:bg-brand/5'}
+        ${uploaded ? 'border-success bg-success/5' : ''}
       `}
     >
       <input {...getInputProps()} />
 
       {uploaded ? (
-        <div className="flex flex-col items-center text-green-600">
-          <CheckCircle className="w-12 h-12 mb-2" />
-          <p className="font-medium">{label}</p>
+        <div className="flex flex-col items-center text-success">
+          <div className="mb-2 flex h-12 w-12 items-center justify-center rounded-full bg-success/10">
+            <CheckCircle className="w-6 h-6" />
+          </div>
+          <p className="font-semibold text-foreground">{label}</p>
           <p className="text-sm">Subido correctamente</p>
         </div>
       ) : (
-        <div className="flex flex-col items-center text-gray-600">
-          <Upload className="w-12 h-12 mb-2" />
-          <p className="font-medium">{label}</p>
+        <div className="flex flex-col items-center text-muted-foreground">
+          <div className="mb-2 flex h-12 w-12 items-center justify-center rounded-full bg-brand/10 text-brand">
+            <Upload className="w-6 h-6" />
+          </div>
+          <p className="font-semibold text-foreground">{label}</p>
           <p className="text-sm">Arrastra o haz clic</p>
         </div>
       )}

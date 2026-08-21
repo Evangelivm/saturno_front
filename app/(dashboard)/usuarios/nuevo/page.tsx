@@ -61,7 +61,7 @@ export default function NuevoUsuarioPage() {
         <form onSubmit={handleSubmit}>
           <CardContent className="space-y-4">
             {error && (
-              <div className="p-3 text-sm text-red-600 bg-red-50 rounded-md">
+              <div className="p-3 text-sm text-red-700 bg-red-50 border border-red-200 rounded-md font-medium">
                 {error}
               </div>
             )}
@@ -110,7 +110,7 @@ export default function NuevoUsuarioPage() {
           </CardContent>
 
           <CardFooter className="flex justify-between">
-            <Button type="button" className="border bg-card text-foreground hover:bg-muted" onClick={() => router.push('/usuarios')}>
+            <Button type="button" variant="outline" onClick={() => router.push('/usuarios')}>
               Cancelar
             </Button>
             <Button type="submit" disabled={loading}>

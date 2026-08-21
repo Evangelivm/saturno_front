@@ -32,8 +32,9 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-muted">
-      <Card className="w-full max-w-md">
+    <div className="min-h-screen flex items-center justify-center bg-muted px-4">
+      <Card className="w-full max-w-md overflow-hidden">
+        <div className="h-1 w-full bg-brand" />
         <CardHeader className="text-center">
           <div className="flex justify-center mb-4">
             <img src="/logo.svg" alt="Saturno Transporte" className="h-16 w-auto" />
@@ -46,7 +47,7 @@ export default function LoginPage() {
         <form onSubmit={handleSubmit}>
           <CardContent className="space-y-4">
             {error && (
-              <div className="p-3 text-sm text-red-600 bg-red-50 rounded-md">
+              <div className="p-3 text-sm text-red-700 bg-red-50 border border-red-200 rounded-md font-medium">
                 {error}
               </div>
             )}
@@ -78,12 +79,12 @@ export default function LoginPage() {
             </div>
           </CardContent>
           <CardFooter className="flex flex-col space-y-4">
-            <Button type="submit" className="w-full" disabled={loading}>
+            <Button type="submit" size="lg" className="w-full" disabled={loading}>
               {loading ? 'Iniciando sesión...' : 'Iniciar Sesión'}
             </Button>
-            <p className="text-sm text-center text-gray-600">
+            <p className="text-sm text-center text-muted-foreground">
               ¿No tienes cuenta?{' '}
-              <Link href="/register" className="text-primary hover:underline">
+              <Link href="/register" className="text-brand font-semibold hover:underline">
                 Regístrate aquí
               </Link>
             </p>

@@ -51,7 +51,7 @@ export default function NuevoComprobantePage() {
         id="tour-help-nuevo-btn"
         onClick={startTour}
         title="Ver tutorial"
-        className="fixed bottom-6 right-6 z-40 flex items-center gap-2 bg-primary text-primary-foreground shadow-lg rounded-full px-4 py-2.5 text-sm font-medium hover:bg-primary/90 transition-all hover:scale-105 active:scale-95"
+        className="fixed bottom-6 right-6 z-40 flex items-center gap-2 bg-brand text-brand-foreground shadow-lg rounded-full px-4 py-2.5 text-sm font-medium hover:bg-brand/90 transition-all hover:scale-105 active:scale-95"
       >
         <HelpCircle className="h-4 w-4" />
         <span className="hidden sm:inline">Tutorial</span>

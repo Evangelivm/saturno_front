@@ -214,7 +214,7 @@ export function ComprobanteForm({ onSuccess }: ComprobanteFormProps) {
             </div>
           </div>
 
-          <Button id="tour-btn-validar" type="submit" className="w-full" disabled={loading}>
+          <Button id="tour-btn-validar" type="submit" size="lg" className="w-full" disabled={loading}>
             {loading ? 'Validando...' : 'Validar Comprobante'}
           </Button>
         </form>
