@@ -129,6 +129,8 @@ export default function ComprobantesPage() {
   const [dateTo, setDateTo] = useState('');
   const [downloadingRange, setDownloadingRange] = useState(false);
   const [downloadRangeBytes, setDownloadRangeBytes] = useState(0);
+  const [downloadingLegacyBatch, setDownloadingLegacyBatch] = useState(false);
+  const [downloadLegacyBatchBytes, setDownloadLegacyBatchBytes] = useState(0);
   const [showBatchDialog, setShowBatchDialog] = useState(false);
   const [selectedTypes, setSelectedTypes] = useState<string[]>(['factura', 'xml', 'guia', 'ordenCompra']);
   const [sunatStatus, setSunatStatus] = useState<'up' | 'down' | null>(null);
@@ -446,6 +448,25 @@ export default function ComprobantesPage() {
     } finally {
       setDownloadingRange(false);
       setDownloadRangeBytes(0);
+    }
+  };
+
+  const handleDownloadLegacyBatch = async () => {
+    setDownloadingLegacyBatch(true);
+    setDownloadLegacyBatchBytes(0);
+    try {
+      const tiposLegacy = selectedTypes.map(t => t === 'ordenCompra' ? 'pedido' : t).join(',');
+      const response = await apiClient.get('/api/reportes/legacy-batch', {
+        params: { desde: dateFrom, hasta: dateTo, tipos: tiposLegacy, ...(selectedRuc ? { ruc: selectedRuc } : {}) },
+        responseType: 'blob',
+        onDownloadProgress: (e) => setDownloadLegacyBatchBytes(e.loaded),
+      });
+      triggerDownload(response.data, `historial-${dateFrom}-a-${dateTo}.zip`);
+    } catch {
+      toast.error('No hay archivos del historial anterior en ese rango de fechas');
+    } finally {
+      setDownloadingLegacyBatch(false);
+      setDownloadLegacyBatchBytes(0);
     }
   };
 
@@ -1136,6 +1157,18 @@ export default function ComprobantesPage() {
                 </div>
               )}
 
+              {downloadingLegacyBatch && (
+                <div className="mt-4 space-y-1">
+                  <div className="flex justify-between text-xs text-amber-700 dark:text-amber-400">
+                    <span>Descargando historial anterior...</span>
+                    <span>{(downloadLegacyBatchBytes / 1024 / 1024).toFixed(1)} MB</span>
+                  </div>
+                  <div className="w-full h-1.5 bg-amber-100 dark:bg-amber-900/40 rounded-full overflow-hidden">
+                    <div className="h-full w-full rounded-full bg-amber-500" style={{ backgroundImage: 'linear-gradient(90deg, rgba(217,119,6,0.3) 0%, rgba(217,119,6,1) 50%, rgba(217,119,6,0.3) 100%)', backgroundSize: '200% 100%', animation: 'shimmer 1.5s ease-in-out infinite' }} />
+                  </div>
+                </div>
+              )}
+
               <div className="flex flex-col-reverse sm:flex-row sm:items-center sm:justify-end gap-2 mt-6">
                 <Button
                   variant="outline"
@@ -1147,23 +1180,14 @@ export default function ComprobantesPage() {
                 {includeLegacy && (
                   <Button
                     variant="warning"
-                    disabled={!dateFrom || !dateTo || dateFrom > dateTo || selectedTypes.length === 0}
-                    onClick={() => {
-                      const tiposLegacy = selectedTypes.map(t => t === 'ordenCompra' ? 'pedido' : t).join(',');
-                      const params = new URLSearchParams({ desde: dateFrom, hasta: dateTo, tipos: tiposLegacy });
-                      if (selectedRuc) params.set('ruc', selectedRuc);
-                      const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
-                      const a = document.createElement('a');
-                      a.href = `${apiBase}/api/reportes/legacy-batch?${params}`;
-                      a.download = `historial-${dateFrom}-a-${dateTo}.zip`;
-                      document.body.appendChild(a);
-                      a.click();
-                      document.body.removeChild(a);
-                    }}
+                    disabled={!dateFrom || !dateTo || dateFrom > dateTo || selectedTypes.length === 0 || downloadingLegacyBatch}
+                    onClick={handleDownloadLegacyBatch}
                     className="w-full sm:w-auto"
                   >
-                    <Download className="h-4 w-4" />
-                    Historial anterior (.zip)
+                    {downloadingLegacyBatch
+                      ? <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      : <Download className="h-4 w-4" />}
+                    {downloadingLegacyBatch ? 'Descargando...' : 'Historial anterior (.zip)'}
                   </Button>
                 )}
                 <Button
