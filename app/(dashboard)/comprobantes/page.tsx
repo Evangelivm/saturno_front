@@ -2,7 +2,9 @@
 
 import { useEffect, useState, useRef, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
+import axios from 'axios';
 import apiClient from '@/lib/api-client';
+import { useBatchDownloadStore } from '@/lib/batch-download-store';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Plus, FileText, CheckCircle, XCircle, ChevronDown, Download, Upload, RotateCcw, Search, X, FileSpreadsheet, HelpCircle, ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react';
@@ -127,11 +129,12 @@ export default function ComprobantesPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
-  const [downloadingRange, setDownloadingRange] = useState(false);
-  const [downloadRangeBytes, setDownloadRangeBytes] = useState(0);
-  const [downloadingLegacyBatch, setDownloadingLegacyBatch] = useState(false);
-  const [downloadLegacyBatchBytes, setDownloadLegacyBatchBytes] = useState(0);
-  const [downloadLegacyBatchTotalBytes, setDownloadLegacyBatchTotalBytes] = useState(0);
+  const rangeDownload = useBatchDownloadStore((s) => s.range);
+  const legacyBatchDownload = useBatchDownloadStore((s) => s.legacyBatch);
+  const startBatchDownload = useBatchDownloadStore((s) => s.start);
+  const setBatchDownloadBytes = useBatchDownloadStore((s) => s.setBytes);
+  const setBatchDownloadTotalBytes = useBatchDownloadStore((s) => s.setTotalBytes);
+  const finishBatchDownload = useBatchDownloadStore((s) => s.finish);
   const [showBatchDialog, setShowBatchDialog] = useState(false);
   const [selectedTypes, setSelectedTypes] = useState<string[]>(['factura', 'xml', 'guia', 'ordenCompra']);
   const [sunatStatus, setSunatStatus] = useState<'up' | 'down' | null>(null);
@@ -435,27 +438,51 @@ export default function ComprobantesPage() {
     setSelectedTypes(prev => prev.includes(tipo) ? prev.filter(t => t !== tipo) : [...prev, tipo]);
 
   const handleDownloadRange = async () => {
-    setDownloadingRange(true);
-    setDownloadRangeBytes(0);
+    const controller = new AbortController();
+    startBatchDownload('range', controller);
+    const toastId = 'download-range';
+
+    toast.loading('Descargando comprobantes... 0.0 MB', {
+      id: toastId,
+      duration: Infinity,
+      action: { label: 'Cancelar', onClick: () => controller.abort() },
+    });
+
     try {
       const response = await apiClient.get('/api/comprobantes/download-range', {
         params: { from: dateFrom, to: dateTo, tipos: selectedTypes.join(','), ...(isAdmin && selectedRuc ? { ruc: selectedRuc } : {}) },
         responseType: 'blob',
-        onDownloadProgress: (e) => setDownloadRangeBytes(e.loaded),
+        signal: controller.signal,
+        onDownloadProgress: (e) => {
+          setBatchDownloadBytes('range', e.loaded);
+          toast.loading(`Descargando comprobantes... ${(e.loaded / 1024 / 1024).toFixed(1)} MB`, {
+            id: toastId,
+            duration: Infinity,
+            action: { label: 'Cancelar', onClick: () => controller.abort() },
+          });
+        },
       });
       triggerDownload(response.data, `comprobantes-${dateFrom}-a-${dateTo}.zip`);
-    } catch {
-      toast.error('No hay archivos en ese rango de fechas');
+      toast.success('Descarga de comprobantes completa', { id: toastId, duration: 5000 });
+    } catch (err) {
+      if (axios.isCancel(err)) {
+        toast.info('Descarga cancelada', { id: toastId, duration: 3000 });
+      } else {
+        toast.error('No hay archivos en ese rango de fechas', { id: toastId, duration: 5000 });
+      }
     } finally {
-      setDownloadingRange(false);
-      setDownloadRangeBytes(0);
+      finishBatchDownload('range');
     }
   };
 
   const handleDownloadLegacyBatch = async () => {
-    setDownloadingLegacyBatch(true);
-    setDownloadLegacyBatchBytes(0);
-    setDownloadLegacyBatchTotalBytes(0);
+    const controller = new AbortController();
+    startBatchDownload('legacyBatch', controller);
+    const toastId = 'download-legacy-batch';
+    const cancelAction = { label: 'Cancelar', onClick: () => controller.abort() };
+
+    toast.loading('Calculando tamaño del historial anterior...', { id: toastId, duration: Infinity, action: cancelAction });
+
     try {
       const tiposLegacy = selectedTypes.map(t => t === 'ordenCompra' ? 'pedido' : t).join(',');
       const params = { desde: dateFrom, hasta: dateTo, tipos: tiposLegacy, ...(selectedRuc ? { ruc: selectedRuc } : {}) };
@@ -465,29 +492,42 @@ export default function ComprobantesPage() {
       // zip comprime un poco, así que el peso real bajará algo de este total.
       let totalBytesEstimado = 0;
       try {
-        const { data: estimate } = await apiClient.get('/api/reportes/legacy-batch-size', { params });
+        const { data: estimate } = await apiClient.get('/api/reportes/legacy-batch-size', { params, signal: controller.signal });
         totalBytesEstimado = estimate.totalBytes ?? 0;
-        setDownloadLegacyBatchTotalBytes(totalBytesEstimado);
-      } catch {
+        setBatchDownloadTotalBytes('legacyBatch', totalBytesEstimado);
+      } catch (err) {
+        if (axios.isCancel(err)) throw err;
         // si falla el estimado seguimos igual, solo sin %
       }
 
       const response = await apiClient.get('/api/reportes/legacy-batch', {
         params,
         responseType: 'blob',
-        onDownloadProgress: (e) => setDownloadLegacyBatchBytes(e.loaded),
+        signal: controller.signal,
+        onDownloadProgress: (e) => {
+          setBatchDownloadBytes('legacyBatch', e.loaded);
+          const mb = (e.loaded / 1024 / 1024).toFixed(1);
+          const pct = totalBytesEstimado > 0 ? Math.min(100, Math.round((e.loaded / totalBytesEstimado) * 100)) : null;
+          toast.loading(
+            pct === null ? `Descargando historial anterior... ${mb} MB` : `Descargando historial anterior... ${pct}% (${mb} MB)`,
+            { id: toastId, duration: Infinity, action: cancelAction },
+          );
+        },
       });
       // El zip comprime, así que el total real casi siempre queda por debajo del
       // estimado (suma de tamaños originales) — sin esto la barra se quedaría
       // pegada cerca del 90% aunque la descarga ya terminó.
-      if (totalBytesEstimado > 0) setDownloadLegacyBatchBytes(totalBytesEstimado);
+      if (totalBytesEstimado > 0) setBatchDownloadBytes('legacyBatch', totalBytesEstimado);
       triggerDownload(response.data, `historial-${dateFrom}-a-${dateTo}.zip`);
-    } catch {
-      toast.error('No hay archivos del historial anterior en ese rango de fechas');
+      toast.success('Descarga del historial anterior completa', { id: toastId, duration: 5000 });
+    } catch (err) {
+      if (axios.isCancel(err)) {
+        toast.info('Descarga cancelada', { id: toastId, duration: 3000 });
+      } else {
+        toast.error('No hay archivos del historial anterior en ese rango de fechas', { id: toastId, duration: 5000 });
+      }
     } finally {
-      setDownloadingLegacyBatch(false);
-      setDownloadLegacyBatchBytes(0);
-      setDownloadLegacyBatchTotalBytes(0);
+      finishBatchDownload('legacyBatch');
     }
   };
 
@@ -495,8 +535,8 @@ export default function ComprobantesPage() {
   // comprime, así que en la práctica no pasa de ~90% hasta que la descarga termina
   // y se fuerza a 100% explícitamente (ver handleDownloadLegacyBatch). Se topa acá
   // solo como salvaguarda por si algún batch pesara más comprimido que el estimado.
-  const legacyBatchPercent = downloadLegacyBatchTotalBytes > 0
-    ? Math.min(100, Math.round((downloadLegacyBatchBytes / downloadLegacyBatchTotalBytes) * 100))
+  const legacyBatchPercent = legacyBatchDownload.totalBytes > 0
+    ? Math.min(100, Math.round((legacyBatchDownload.bytes / legacyBatchDownload.totalBytes) * 100))
     : null;
 
   // ── Initial loading state (solo la primera vez) ────────────────────────────
@@ -1174,11 +1214,21 @@ export default function ComprobantesPage() {
                 </p>
               </div>
 
-              {downloadingRange && (
+              {rangeDownload.downloading && (
                 <div className="mt-4 space-y-1">
-                  <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400">
+                  <div className="flex justify-between items-center text-xs text-gray-500 dark:text-gray-400">
                     <span>Descargando comprobantes...</span>
-                    <span>{(downloadRangeBytes / 1024 / 1024).toFixed(1)} MB</span>
+                    <span className="flex items-center gap-2">
+                      {(rangeDownload.bytes / 1024 / 1024).toFixed(1)} MB
+                      <button
+                        type="button"
+                        onClick={() => rangeDownload.controller?.abort()}
+                        className="text-gray-400 hover:text-red-500 transition-colors"
+                        title="Cancelar descarga"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    </span>
                   </div>
                   <div className="w-full h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
                     <div className="h-full w-full rounded-full" style={{ background: 'linear-gradient(90deg, hsl(var(--brand)/0.3) 0%, hsl(var(--brand)) 50%, hsl(var(--brand)/0.3) 100%)', backgroundSize: '200% 100%', animation: 'shimmer 1.5s ease-in-out infinite' }} />
@@ -1186,15 +1236,23 @@ export default function ComprobantesPage() {
                 </div>
               )}
 
-              {downloadingLegacyBatch && (
+              {legacyBatchDownload.downloading && (
                 <div className="mt-4 space-y-1">
-                  <div className="flex justify-between text-xs text-amber-700 dark:text-amber-400">
+                  <div className="flex justify-between items-center text-xs text-amber-700 dark:text-amber-400">
                     <span>
                       {legacyBatchPercent === null ? 'Calculando tamaño...' : `Descargando historial anterior... ${legacyBatchPercent}%`}
                     </span>
-                    <span>
-                      {(downloadLegacyBatchBytes / 1024 / 1024).toFixed(1)} MB
-                      {downloadLegacyBatchTotalBytes > 0 && ` de ~${(downloadLegacyBatchTotalBytes / 1024 / 1024).toFixed(1)} MB`}
+                    <span className="flex items-center gap-2">
+                      {(legacyBatchDownload.bytes / 1024 / 1024).toFixed(1)} MB
+                      {legacyBatchDownload.totalBytes > 0 && ` de ~${(legacyBatchDownload.totalBytes / 1024 / 1024).toFixed(1)} MB`}
+                      <button
+                        type="button"
+                        onClick={() => legacyBatchDownload.controller?.abort()}
+                        className="text-amber-500 hover:text-red-500 transition-colors"
+                        title="Cancelar descarga"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
                     </span>
                   </div>
                   <div className="w-full h-1.5 bg-amber-100 dark:bg-amber-900/40 rounded-full overflow-hidden">
@@ -1218,25 +1276,25 @@ export default function ComprobantesPage() {
                 {includeLegacy && (
                   <Button
                     variant="warning"
-                    disabled={!dateFrom || !dateTo || dateFrom > dateTo || selectedTypes.length === 0 || downloadingLegacyBatch}
+                    disabled={!dateFrom || !dateTo || dateFrom > dateTo || selectedTypes.length === 0 || legacyBatchDownload.downloading}
                     onClick={handleDownloadLegacyBatch}
                     className="w-full"
                   >
-                    {downloadingLegacyBatch
+                    {legacyBatchDownload.downloading
                       ? <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                       : <Download className="h-4 w-4" />}
-                    {downloadingLegacyBatch ? 'Descargando...' : 'Historial anterior (.zip)'}
+                    {legacyBatchDownload.downloading ? 'Descargando...' : 'Historial anterior (.zip)'}
                   </Button>
                 )}
                 <Button
                   onClick={handleDownloadRange}
-                  disabled={!dateFrom || !dateTo || dateFrom > dateTo || selectedTypes.length === 0 || downloadingRange}
+                  disabled={!dateFrom || !dateTo || dateFrom > dateTo || selectedTypes.length === 0 || rangeDownload.downloading}
                   className={includeLegacy ? 'w-full' : 'w-full sm:w-auto'}
                 >
-                  {downloadingRange
+                  {rangeDownload.downloading
                     ? <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                     : <Download className="h-4 w-4" />}
-                  {downloadingRange ? 'Descargando...' : 'Descargar (.zip)'}
+                  {rangeDownload.downloading ? 'Descargando...' : 'Descargar (.zip)'}
                 </Button>
               </div>
             </div>
