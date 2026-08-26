@@ -131,6 +131,7 @@ export default function ComprobantesPage() {
   const [downloadRangeBytes, setDownloadRangeBytes] = useState(0);
   const [downloadingLegacyBatch, setDownloadingLegacyBatch] = useState(false);
   const [downloadLegacyBatchBytes, setDownloadLegacyBatchBytes] = useState(0);
+  const [downloadLegacyBatchTotalBytes, setDownloadLegacyBatchTotalBytes] = useState(0);
   const [showBatchDialog, setShowBatchDialog] = useState(false);
   const [selectedTypes, setSelectedTypes] = useState<string[]>(['factura', 'xml', 'guia', 'ordenCompra']);
   const [sunatStatus, setSunatStatus] = useState<'up' | 'down' | null>(null);
@@ -454,21 +455,49 @@ export default function ComprobantesPage() {
   const handleDownloadLegacyBatch = async () => {
     setDownloadingLegacyBatch(true);
     setDownloadLegacyBatchBytes(0);
+    setDownloadLegacyBatchTotalBytes(0);
     try {
       const tiposLegacy = selectedTypes.map(t => t === 'ordenCompra' ? 'pedido' : t).join(',');
+      const params = { desde: dateFrom, hasta: dateTo, tipos: tiposLegacy, ...(selectedRuc ? { ruc: selectedRuc } : {}) };
+
+      // Estimado rápido (solo lookups en memoria, sin tocar R2/Drive) para poder
+      // mostrar % real en vez de un MB suelto sin referencia. Es aproximado: el
+      // zip comprime un poco, así que el peso real bajará algo de este total.
+      let totalBytesEstimado = 0;
+      try {
+        const { data: estimate } = await apiClient.get('/api/reportes/legacy-batch-size', { params });
+        totalBytesEstimado = estimate.totalBytes ?? 0;
+        setDownloadLegacyBatchTotalBytes(totalBytesEstimado);
+      } catch {
+        // si falla el estimado seguimos igual, solo sin %
+      }
+
       const response = await apiClient.get('/api/reportes/legacy-batch', {
-        params: { desde: dateFrom, hasta: dateTo, tipos: tiposLegacy, ...(selectedRuc ? { ruc: selectedRuc } : {}) },
+        params,
         responseType: 'blob',
         onDownloadProgress: (e) => setDownloadLegacyBatchBytes(e.loaded),
       });
+      // El zip comprime, así que el total real casi siempre queda por debajo del
+      // estimado (suma de tamaños originales) — sin esto la barra se quedaría
+      // pegada cerca del 90% aunque la descarga ya terminó.
+      if (totalBytesEstimado > 0) setDownloadLegacyBatchBytes(totalBytesEstimado);
       triggerDownload(response.data, `historial-${dateFrom}-a-${dateTo}.zip`);
     } catch {
       toast.error('No hay archivos del historial anterior en ese rango de fechas');
     } finally {
       setDownloadingLegacyBatch(false);
       setDownloadLegacyBatchBytes(0);
+      setDownloadLegacyBatchTotalBytes(0);
     }
   };
+
+  // El total es un estimado (suma de tamaños originales antes del zip) y el zip
+  // comprime, así que en la práctica no pasa de ~90% hasta que la descarga termina
+  // y se fuerza a 100% explícitamente (ver handleDownloadLegacyBatch). Se topa acá
+  // solo como salvaguarda por si algún batch pesara más comprimido que el estimado.
+  const legacyBatchPercent = downloadLegacyBatchTotalBytes > 0
+    ? Math.min(100, Math.round((downloadLegacyBatchBytes / downloadLegacyBatchTotalBytes) * 100))
+    : null;
 
   // ── Initial loading state (solo la primera vez) ────────────────────────────
   if (loading && !initialLoadDone.current) {
@@ -1160,20 +1189,29 @@ export default function ComprobantesPage() {
               {downloadingLegacyBatch && (
                 <div className="mt-4 space-y-1">
                   <div className="flex justify-between text-xs text-amber-700 dark:text-amber-400">
-                    <span>Descargando historial anterior...</span>
-                    <span>{(downloadLegacyBatchBytes / 1024 / 1024).toFixed(1)} MB</span>
+                    <span>
+                      {legacyBatchPercent === null ? 'Calculando tamaño...' : `Descargando historial anterior... ${legacyBatchPercent}%`}
+                    </span>
+                    <span>
+                      {(downloadLegacyBatchBytes / 1024 / 1024).toFixed(1)} MB
+                      {downloadLegacyBatchTotalBytes > 0 && ` de ~${(downloadLegacyBatchTotalBytes / 1024 / 1024).toFixed(1)} MB`}
+                    </span>
                   </div>
                   <div className="w-full h-1.5 bg-amber-100 dark:bg-amber-900/40 rounded-full overflow-hidden">
-                    <div className="h-full w-full rounded-full bg-amber-500" style={{ backgroundImage: 'linear-gradient(90deg, rgba(217,119,6,0.3) 0%, rgba(217,119,6,1) 50%, rgba(217,119,6,0.3) 100%)', backgroundSize: '200% 100%', animation: 'shimmer 1.5s ease-in-out infinite' }} />
+                    {legacyBatchPercent === null ? (
+                      <div className="h-full w-full rounded-full bg-amber-500" style={{ backgroundImage: 'linear-gradient(90deg, rgba(217,119,6,0.3) 0%, rgba(217,119,6,1) 50%, rgba(217,119,6,0.3) 100%)', backgroundSize: '200% 100%', animation: 'shimmer 1.5s ease-in-out infinite' }} />
+                    ) : (
+                      <div className="h-full rounded-full bg-amber-500 transition-all duration-300" style={{ width: `${legacyBatchPercent}%` }} />
+                    )}
                   </div>
                 </div>
               )}
 
-              <div className="flex flex-col-reverse sm:flex-row sm:items-center sm:justify-end gap-2 mt-6">
+              <div className={`flex flex-col-reverse gap-2 mt-6 ${includeLegacy ? '' : 'sm:flex-row sm:items-center sm:justify-end'}`}>
                 <Button
                   variant="outline"
                   onClick={() => setShowBatchDialog(false)}
-                  className="w-full sm:w-auto"
+                  className={includeLegacy ? 'w-full' : 'w-full sm:w-auto'}
                 >
                   Cancelar
                 </Button>
@@ -1182,7 +1220,7 @@ export default function ComprobantesPage() {
                     variant="warning"
                     disabled={!dateFrom || !dateTo || dateFrom > dateTo || selectedTypes.length === 0 || downloadingLegacyBatch}
                     onClick={handleDownloadLegacyBatch}
-                    className="w-full sm:w-auto"
+                    className="w-full"
                   >
                     {downloadingLegacyBatch
                       ? <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
@@ -1193,7 +1231,7 @@ export default function ComprobantesPage() {
                 <Button
                   onClick={handleDownloadRange}
                   disabled={!dateFrom || !dateTo || dateFrom > dateTo || selectedTypes.length === 0 || downloadingRange}
-                  className="w-full sm:w-auto"
+                  className={includeLegacy ? 'w-full' : 'w-full sm:w-auto'}
                 >
                   {downloadingRange
                     ? <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
