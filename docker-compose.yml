@@ -1,14 +1,62 @@
 services:
-  app:
+  app-blue:
     build:
       context: .
       dockerfile: Dockerfile
-    ports:
-      - "3004:3004" # El puerto interno de tu contenedor
+      args:
+        - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
+    container_name: saturno_front_blue
+    expose:
+      - "3004"
     environment:
       NODE_ENV: production
       PORT: 3004
       HOSTNAME: 0.0.0.0
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3004 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+    networks:
+      - saturno_network
+
+  app-green:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
+    container_name: saturno_front_green
+    expose:
+      - "3004"
+    environment:
+      NODE_ENV: production
+      PORT: 3004
+      HOSTNAME: 0.0.0.0
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3004 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+    networks:
+      - saturno_network
+
+  caddy:
+    build:
+      context: .
+      dockerfile: Dockerfile.caddy
+    container_name: saturno_front_caddy
+    ports:
+      - "3004:3004"
+    volumes:
+      - caddy_data:/data
+      - caddy_config:/config
     restart: unless-stopped
     networks:
       - saturno_network
@@ -16,3 +64,7 @@ services:
 networks:
   saturno_network:
     external: true
+
+volumes:
+  caddy_data:
+  caddy_config:

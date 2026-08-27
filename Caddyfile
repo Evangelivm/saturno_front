@@ -1,0 +1,3 @@
+:3004 {
+    reverse_proxy saturno_front_blue:3004
+}
