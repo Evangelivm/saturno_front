@@ -1,7 +1,7 @@
 pipeline {
     agent any
     environment {
-        NEXT_PUBLIC_API_URL = credentials('saturno-front-next-public-api-url')
+        NEXT_PUBLIC_API_URL = credentials('next-public-api-url')
         WORKDIR = '/var/jenkins_home/workspace/saturno/saturno-front'
     }
     stages {
