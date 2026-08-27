@@ -7,7 +7,7 @@ import apiClient from '@/lib/api-client';
 import { useBatchDownloadStore } from '@/lib/batch-download-store';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Plus, FileText, CheckCircle, XCircle, ChevronDown, Download, Upload, RotateCcw, Search, X, FileSpreadsheet, HelpCircle, ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react';
+import { Plus, FileText, CheckCircle, XCircle, Clock, ChevronDown, Download, Upload, RotateCcw, Search, X, FileSpreadsheet, HelpCircle, ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/hooks/use-auth';
 import { useComprobantesTour } from '@/hooks/use-comprobantes-tour';
@@ -45,7 +45,7 @@ interface Comprobante {
   fechaEmision: string;
   monto: number | null;
   codigoAlfanumerico: string;
-  sunatSuccess: boolean;
+  sunatSuccess: boolean | null;
   sunatMessage: string | null;
   sunatEstadoCp: number | null;
   createdAt: string;
@@ -108,7 +108,7 @@ export default function ComprobantesPage() {
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
-  const [stats, setStats] = useState({ total: 0, validados: 0, rechazados: 0 });
+  const [stats, setStats] = useState({ total: 0, validados: 0, rechazados: 0, pendientes: 0 });
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [sortBy, setSortBy] = useState<string | null>(null);
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
@@ -300,7 +300,8 @@ export default function ComprobantesPage() {
       ? (ESTADO_CP_MAP[estadoCp] ?? { label: `Estado ${estadoCp}`, color: 'text-gray-600 bg-gray-50' })
       : { label: '—', color: 'text-gray-400 bg-transparent' };
 
-  const getEstadoLabel = (success: boolean, estadoCp: number | null) => {
+  const getEstadoLabel = (success: boolean | null, estadoCp: number | null) => {
+    if (success === null) return { label: 'Pendiente', color: 'text-amber-600 bg-amber-50' };
     if (!success) return { label: 'Rechazado', color: 'text-red-600 bg-red-50' };
     switch (estadoCp) {
       case 0: return { label: 'No existe',     color: 'text-gray-600 bg-gray-50' };
@@ -596,7 +597,7 @@ export default function ComprobantesPage() {
         </div>
 
         {/* ── Stats ── */}
-        <div id="tour-stats" className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div id="tour-stats" className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
           <Card className="border-t-2 border-t-primary">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">Total Comprobantes</CardTitle>
@@ -628,6 +629,17 @@ export default function ComprobantesPage() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-destructive">{stats.rechazados}</div>
+            </CardContent>
+          </Card>
+          <Card className="border-t-2 border-t-amber-500">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">Pendientes</CardTitle>
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-500/10">
+                <Clock className="h-4 w-4 text-amber-600" />
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-amber-600">{stats.pendientes}</div>
             </CardContent>
           </Card>
         </div>

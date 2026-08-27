@@ -34,6 +34,11 @@ export function Navbar() {
       label: 'Nuevo Comprobante',
       icon: Plus,
     },
+    {
+      href: '/configuracion',
+      label: 'Configuración',
+      icon: Settings,
+    },
   ];
 
   const adminNavLinks = [
@@ -46,11 +51,6 @@ export function Navbar() {
       href: '/usuarios/nuevo',
       label: 'Nuevo Usuario',
       icon: UserPlus,
-    },
-    {
-      href: '/configuracion',
-      label: 'Configuración',
-      icon: Settings,
     },
   ];
 

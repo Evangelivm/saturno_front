@@ -1,11 +1,10 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/use-auth';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
-import { RefreshCw, Database, CheckCircle, XCircle, Loader2 } from 'lucide-react';
+import { RefreshCw, Database, CheckCircle, XCircle, Loader2, KeyRound } from 'lucide-react';
 import apiClient from '@/lib/api-client';
 import { toast } from 'sonner';
 
@@ -23,12 +22,16 @@ interface SyncResult {
 
 export default function ConfiguracionPage() {
   const { user, loading: authLoading } = useAuth();
-  const router = useRouter();
 
   const [esStatus, setEsStatus] = useState<EsStatus | null>(null);
   const [statusLoading, setStatusLoading] = useState(true);
   const [syncLoading, setSyncLoading] = useState<'all' | 'comprobantes' | 'legacy' | null>(null);
   const [lastSync, setLastSync] = useState<{ comprobantes?: SyncResult; legacy?: SyncResult } | null>(null);
+
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [changingPassword, setChangingPassword] = useState(false);
 
   const fetchStatus = useCallback(async () => {
     setStatusLoading(true);
@@ -44,12 +47,28 @@ export default function ConfiguracionPage() {
 
   useEffect(() => {
     if (authLoading) return;
-    if (user?.role !== 'ADMIN') {
-      router.push('/comprobantes');
+    if (user?.role === 'ADMIN') fetchStatus();
+  }, [user, authLoading, fetchStatus]);
+
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (newPassword !== confirmPassword) {
+      toast.error('Las contraseñas nuevas no coinciden');
       return;
     }
-    fetchStatus();
-  }, [user, authLoading, router, fetchStatus]);
+    setChangingPassword(true);
+    try {
+      await apiClient.put('/api/auth/me/password', { currentPassword, newPassword });
+      toast.success('Contraseña actualizada exitosamente');
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'No se pudo cambiar la contraseña');
+    } finally {
+      setChangingPassword(false);
+    }
+  };
 
   const handleSync = async (type: 'all' | 'comprobantes' | 'legacy') => {
     setSyncLoading(type);
@@ -85,7 +104,58 @@ export default function ConfiguracionPage() {
     <div className="max-w-3xl mx-auto px-4 py-8 space-y-6">
       <h1 className="text-2xl font-bold">Configuración</h1>
 
-      {/* Estado de Elasticsearch */}
+      {/* Cambiar contraseña */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base flex items-center gap-2">
+            <KeyRound className="h-4 w-4" />
+            Cambiar contraseña
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleChangePassword} className="space-y-3 max-w-sm">
+            <div>
+              <label className="block text-xs font-medium text-muted-foreground mb-1">Contraseña actual</label>
+              <input
+                type="password"
+                value={currentPassword}
+                onChange={(e) => setCurrentPassword(e.target.value)}
+                required
+                className="w-full px-3 py-2 text-sm border rounded-md bg-card focus:outline-none focus:ring-2 focus:ring-brand/20"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-muted-foreground mb-1">Nueva contraseña</label>
+              <input
+                type="password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                minLength={8}
+                required
+                className="w-full px-3 py-2 text-sm border rounded-md bg-card focus:outline-none focus:ring-2 focus:ring-brand/20"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-muted-foreground mb-1">Confirmar nueva contraseña</label>
+              <input
+                type="password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                minLength={8}
+                required
+                className="w-full px-3 py-2 text-sm border rounded-md bg-card focus:outline-none focus:ring-2 focus:ring-brand/20"
+              />
+            </div>
+            <Button type="submit" disabled={changingPassword} className="flex items-center gap-2">
+              {changingPassword && <Loader2 className="h-4 w-4 animate-spin" />}
+              Actualizar contraseña
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
+
+      {/* Estado de Elasticsearch — solo administradores */}
+      {user?.role === 'ADMIN' && (
       <Card>
         <CardHeader className="flex flex-row items-center justify-between pb-3">
           <CardTitle className="text-base flex items-center gap-2">
@@ -188,6 +258,7 @@ export default function ConfiguracionPage() {
           </p>
         </CardContent>
       </Card>
+      )}
     </div>
   );
 }
