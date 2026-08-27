@@ -2,7 +2,7 @@ pipeline {
     agent any
     environment {
         NEXT_PUBLIC_API_URL = credentials('saturno-front-next-public-api-url')
-        WORKDIR = '/var/jenkins_home/workspace/front/saturno_front'
+        WORKDIR = '/var/jenkins_home/workspace/saturno/saturno-front'
     }
     stages {
         stage('Obtener código') {
@@ -89,7 +89,7 @@ pipeline {
                 cd $WORKDIR
                 docker exec saturno_front_caddy sh -c "sed -i 's/saturno_front_${ACTIVE_COLOR}:3004/saturno_front_${IDLE_COLOR}:3004/' /etc/caddy/Caddyfile"
                 docker exec saturno_front_caddy caddy reload --config /etc/caddy/Caddyfile
-                echo "🚀 Tráfico ahora en ${IDLE_COLOR} — puerto 3004"
+                echo "🚀 Tráfico ahora en ${IDLE_COLOR} — http://161.132.41.248:3004/"
                 '''
             }
         }
@@ -113,7 +113,7 @@ pipeline {
             echo '❌ Pipeline fallido - Revisar logs (la instancia anterior sigue sirviendo tráfico, no hubo downtime)'
         }
         success {
-            echo '🎉 ¡Despliegue blue-green exitoso!'
+            echo '🎉 ¡Despliegue blue-green exitoso! http://161.132.41.248:3004/'
         }
     }
 }
