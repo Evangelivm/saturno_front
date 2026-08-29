@@ -350,8 +350,18 @@ export default function ComprobantesPage() {
     formData.append('tipoArchivo', pending.tipo);
 
     try {
-      const response = await apiClient.post(`/api/comprobantes/${pending.comprobanteId}/upload`, formData);
-      const { fileId, fileName } = response.data.data;
+      // axios (empaquetado por Next.js/Webpack en este proyecto) termina serializando
+      // el FormData como JSON en vez de mandarlo como multipart. fetch() nativo nunca
+      // pasa por esa lógica: maneja el FormData directo, con el boundary correcto.
+      const res = await fetch(`${apiClient.defaults.baseURL}/api/comprobantes/${pending.comprobanteId}/upload`, {
+        method: 'POST',
+        credentials: 'include',
+        body: formData,
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body.message || `Error ${res.status}`);
+
+      const { fileId, fileName } = body.data;
 
       setComprobantes(prev => prev.map(c => {
         if (c.id !== pending.comprobanteId) return c;
@@ -364,8 +374,8 @@ export default function ComprobantesPage() {
       }));
 
       toast.success('Archivo cargado correctamente');
-    } catch {
-      toast.error('Error al subir archivo');
+    } catch (error: any) {
+      toast.error(error.message || 'Error al subir archivo');
     } finally {
       setUploadingKey(null);
       pendingUploadRef.current = null;
