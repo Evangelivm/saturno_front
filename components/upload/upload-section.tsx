@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import axios from 'axios';
 import { FileDropzone } from './file-dropzone';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import apiClient from '@/lib/api-client';
@@ -49,22 +48,31 @@ export function UploadSection({
     formData.append('tipoArchivo', tipo);
 
     try {
-      // apiClient trae 'Content-Type: application/json' fijo como default de instancia;
-      // pisarlo con undefined no es confiable (depende del merge interno de axios).
-      // Se usa axios "limpio" (sin ese default) para que arme el multipart con el
-      // boundary correcto él solo.
-      const response = await axios.post(
+      // axios (empaquetado por Next.js/Webpack en este proyecto) termina serializando
+      // el FormData como JSON en vez de mandarlo como multipart — bug conocido de
+      // axios con ciertos bundlers. fetch() nativo nunca pasa por esa lógica: maneja
+      // el FormData directo, con el boundary correcto siempre.
+      const res = await fetch(
         `${apiClient.defaults.baseURL}/api/comprobantes/${comprobanteId}/upload`,
-        formData,
-        { withCredentials: true }
+        {
+          method: 'POST',
+          credentials: 'include',
+          body: formData,
+        }
       );
 
-      if (response.data.success) {
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        throw new Error(data.message || `Error ${res.status}`);
+      }
+
+      if (data.success) {
         setUploads(prev => ({ ...prev, [tipo]: true }));
         toast.success(`${tipo.toUpperCase()} subido correctamente`);
       }
     } catch (error: any) {
-      toast.error(`Error al subir ${tipo}: ${error.response?.data?.message || error.message}`);
+      toast.error(`Error al subir ${tipo}: ${error.message}`);
     }
   };
 
