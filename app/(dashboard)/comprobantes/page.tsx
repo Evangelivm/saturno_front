@@ -7,7 +7,7 @@ import apiClient from '@/lib/api-client';
 import { useBatchDownloadStore } from '@/lib/batch-download-store';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Plus, FileText, CheckCircle, XCircle, Clock, ChevronDown, Download, Upload, RotateCcw, Search, X, FileSpreadsheet, HelpCircle, ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react';
+import { Plus, FileText, CheckCircle, XCircle, Clock, ChevronDown, Download, Upload, RotateCcw, Search, X, FileSpreadsheet, HelpCircle, ArrowUp, ArrowDown, ArrowUpDown, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/hooks/use-auth';
 import { useComprobantesTour } from '@/hooks/use-comprobantes-tour';
@@ -125,6 +125,7 @@ export default function ComprobantesPage() {
   const [uploadingKey, setUploadingKey] = useState<string | null>(null);
   const [downloadingKey, setDownloadingKey] = useState<string | null>(null);
   const [revalidatingId, setRevalidatingId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [validatingContabilidadId, setValidatingContabilidadId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [dateFrom, setDateFrom] = useState('');
@@ -388,6 +389,21 @@ export default function ComprobantesPage() {
       toast.error(error.response?.data?.message || 'Error al revalidar comprobante');
     } finally {
       setRevalidatingId(null);
+    }
+  };
+
+  const handleDelete = async (comprobanteId: string, codigo: string) => {
+    if (!window.confirm(`¿Eliminar el comprobante ${codigo}? Esta acción no se puede deshacer.`)) return;
+
+    setDeletingId(comprobanteId);
+    try {
+      await apiClient.delete(`/api/comprobantes/${comprobanteId}`);
+      toast.success('Comprobante eliminado');
+      fetchComprobantes(page, debouncedSearch);
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || 'Error al eliminar comprobante');
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -790,14 +806,26 @@ export default function ComprobantesPage() {
                                 </p>
                               </div>
                             )}
-                            <button
-                              onClick={(e) => { e.stopPropagation(); handleRevalidate(comprobante.id); }}
-                              disabled={revalidatingId === comprobante.id}
-                              className="mt-3 flex items-center gap-1.5 text-xs font-medium text-brand border border-brand/30 rounded-md px-2.5 py-1 hover:bg-brand/10 active:bg-brand/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
-                            >
-                              <RotateCcw className={`h-3.5 w-3.5 ${revalidatingId === comprobante.id ? 'animate-spin' : ''}`} />
-                              {revalidatingId === comprobante.id ? 'Revalidando...' : 'Revalidar con SUNAT'}
-                            </button>
+                            <div className="mt-3 flex items-center gap-2">
+                              <button
+                                onClick={(e) => { e.stopPropagation(); handleRevalidate(comprobante.id); }}
+                                disabled={revalidatingId === comprobante.id}
+                                className="flex items-center gap-1.5 text-xs font-medium text-brand border border-brand/30 rounded-md px-2.5 py-1 hover:bg-brand/10 active:bg-brand/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                              >
+                                <RotateCcw className={`h-3.5 w-3.5 ${revalidatingId === comprobante.id ? 'animate-spin' : ''}`} />
+                                {revalidatingId === comprobante.id ? 'Revalidando...' : 'Revalidar con SUNAT'}
+                              </button>
+                              {isAdmin && (
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); handleDelete(comprobante.id, comprobante.codigoAlfanumerico); }}
+                                  disabled={deletingId === comprobante.id}
+                                  className="flex items-center gap-1.5 text-xs font-medium text-red-600 border border-red-300 rounded-md px-2.5 py-1 hover:bg-red-50 active:bg-red-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                  {deletingId === comprobante.id ? 'Eliminando...' : 'Eliminar'}
+                                </button>
+                              )}
+                            </div>
                           </div>
                           <div>
                             <div className="flex items-center justify-between mb-3">
