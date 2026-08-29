@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import axios from 'axios';
 import { FileDropzone } from './file-dropzone';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import apiClient from '@/lib/api-client';
@@ -48,17 +49,14 @@ export function UploadSection({
     formData.append('tipoArchivo', tipo);
 
     try {
-      const response = await apiClient.post(
-        `/api/comprobantes/${comprobanteId}/upload`,
+      // apiClient trae 'Content-Type: application/json' fijo como default de instancia;
+      // pisarlo con undefined no es confiable (depende del merge interno de axios).
+      // Se usa axios "limpio" (sin ese default) para que arme el multipart con el
+      // boundary correcto él solo.
+      const response = await axios.post(
+        `${apiClient.defaults.baseURL}/api/comprobantes/${comprobanteId}/upload`,
         formData,
-        {
-          // No fijar 'multipart/form-data' a mano: sin el boundary, Multer no puede
-          // parsear el archivo. Con Content-Type undefined, axios deja que el
-          // navegador lo genere solo (incluye el boundary correcto).
-          headers: {
-            'Content-Type': undefined,
-          },
-        }
+        { withCredentials: true }
       );
 
       if (response.data.success) {
