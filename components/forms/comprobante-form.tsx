@@ -54,12 +54,17 @@ export function ComprobanteForm({ onSuccess }: ComprobanteFormProps) {
       // Enviar al backend
       const response = await apiClient.post('/api/comprobantes', validatedData);
 
-      if (response.data.success) {
+      // El comprobante siempre queda registrado aunque la validación con SUNAT
+      // falle o quede pendiente (ver comprobantes.service.ts) — "success" solo
+      // describe el resultado de esa validación, no si se guardó o no.
+      if (response.data.success === true) {
         toast.success('Comprobante validado exitosamente');
-        onSuccess(response.data.data.id, response.data.data.codigoAlfanumerico, validatedData);
+      } else if (response.data.success === false) {
+        toast.warning(response.data.message || 'Comprobante registrado, pero no se pudo validar con SUNAT');
       } else {
-        toast.error(response.data.message || 'Error en la validación');
+        toast.info(response.data.message || 'Comprobante registrado. Se validará cuando SUNAT esté disponible.');
       }
+      onSuccess(response.data.data.id, response.data.data.codigoAlfanumerico, validatedData);
     } catch (error: any) {
       if (error.errors) {
         // Errores de validación de Zod
