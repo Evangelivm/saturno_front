@@ -384,8 +384,8 @@ export default function ComprobantesPage() {
       }));
 
       toast.success(success ? 'Revalidación exitosa' : 'Revalidación completada con observaciones');
-    } catch {
-      toast.error('Error al revalidar comprobante');
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || 'Error al revalidar comprobante');
     } finally {
       setRevalidatingId(null);
     }
