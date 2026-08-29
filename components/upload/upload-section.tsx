@@ -52,8 +52,11 @@ export function UploadSection({
         `/api/comprobantes/${comprobanteId}/upload`,
         formData,
         {
+          // No fijar 'multipart/form-data' a mano: sin el boundary, Multer no puede
+          // parsear el archivo. Con Content-Type undefined, axios deja que el
+          // navegador lo genere solo (incluye el boundary correcto).
           headers: {
-            'Content-Type': 'multipart/form-data',
+            'Content-Type': undefined,
           },
         }
       );
