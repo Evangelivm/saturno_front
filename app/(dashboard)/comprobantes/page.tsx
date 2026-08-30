@@ -8,7 +8,7 @@ import { generateComprobanteFileName } from '@/lib/generate-comprobante-filename
 import { useBatchDownloadStore } from '@/lib/batch-download-store';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Plus, FileText, CheckCircle, XCircle, Clock, ChevronDown, Download, Upload, RotateCcw, Search, X, FileSpreadsheet, HelpCircle, ArrowUp, ArrowDown, ArrowUpDown, Trash2 } from 'lucide-react';
+import { Plus, FileText, CheckCircle, XCircle, Clock, ChevronDown, Download, Upload, RotateCcw, Search, X, FileSpreadsheet, HelpCircle, ArrowUp, ArrowDown, ArrowUpDown, Trash2, Eye } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/hooks/use-auth';
 import { useComprobantesTour } from '@/hooks/use-comprobantes-tour';
@@ -468,6 +468,10 @@ export default function ComprobantesPage() {
     finally { setDownloadingKey(null); }
   };
 
+  const handlePreviewFile = (comprobanteId: string, tipo: string) => {
+    window.open(`${apiClient.defaults.baseURL}/api/comprobantes/${comprobanteId}/download/${tipo}?inline=true`, '_blank');
+  };
+
   const handleDownloadAll = async (comprobanteId: string, codigoAlfanumerico: string) => {
     setDownloadingKey(`${comprobanteId}-all`);
     try {
@@ -876,14 +880,21 @@ export default function ComprobantesPage() {
                                     <span className={`text-xs font-semibold px-2 py-0.5 rounded ${getBadgeColor(file.tipo)}`}>{file.label}</span>
                                     <button
                                       type="button"
-                                      onClick={(e) => { e.stopPropagation(); handleDownloadFile(comprobante.id, file.tipo, file.fileName); }}
+                                      onClick={(e) => { e.stopPropagation(); handlePreviewFile(comprobante.id, file.tipo); }}
                                       className="text-xs text-muted-foreground truncate hover:text-brand transition-colors text-left cursor-pointer"
-                                      title="Descargar archivo"
+                                      title="Vista previa"
                                     >
                                       {file.fileName}
                                     </button>
                                   </div>
                                   <div className="flex items-center gap-0.5 shrink-0">
+                                    <button
+                                      onClick={(e) => { e.stopPropagation(); handlePreviewFile(comprobante.id, file.tipo); }}
+                                      className="p-1.5 rounded-md border border-muted bg-card hover:bg-muted active:bg-muted/80 transition-colors cursor-pointer"
+                                      title="Vista previa"
+                                    >
+                                      <Eye className="h-3.5 w-3.5 text-muted-foreground" />
+                                    </button>
                                     <button
                                       onClick={(e) => { e.stopPropagation(); handleDownloadFile(comprobante.id, file.tipo, file.fileName); }}
                                       disabled={downloadingKey === `${comprobante.id}-${file.tipo}`}
