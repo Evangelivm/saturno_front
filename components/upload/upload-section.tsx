@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { FileDropzone } from './file-dropzone';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import apiClient from '@/lib/api-client';
+import { generateComprobanteFileName } from '@/lib/generate-comprobante-filename';
 import { toast } from 'sonner';
 
 interface UploadSectionProps {
@@ -29,17 +30,10 @@ export function UploadSection({
     guia: false,
   });
 
-  // Generar nombre de archivo según nomenclatura
-  const generateFileName = (tipo: 'factura' | 'xml' | 'guia', originalName: string) => {
-    const [dia, mes, año] = fechaEmision.split('/');
-    const extension = originalName.split('.').pop();
-    const tipoSuffix = tipo === 'factura' ? 'factura' : tipo === 'xml' ? 'XML' : 'guia';
-
-    return `${ruc}-${serie}-${numero}-${dia}-${mes}-${año}-${codigoAlfanumerico}-${tipoSuffix}.${extension}`;
-  };
-
   const handleUpload = async (file: File, tipo: 'factura' | 'xml' | 'guia') => {
-    const newFileName = generateFileName(tipo, file.name);
+    const newFileName = generateComprobanteFileName({
+      ruc, serie, numero, fechaEmision, codigoAlfanumerico, tipo, originalName: file.name,
+    });
 
     // Crear FormData con el archivo renombrado
     const formData = new FormData();

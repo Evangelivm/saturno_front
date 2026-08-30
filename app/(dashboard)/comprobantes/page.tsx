@@ -4,6 +4,7 @@ import { useEffect, useState, useRef, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import axios from 'axios';
 import apiClient from '@/lib/api-client';
+import { generateComprobanteFileName } from '@/lib/generate-comprobante-filename';
 import { useBatchDownloadStore } from '@/lib/batch-download-store';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -344,9 +345,24 @@ export default function ComprobantesPage() {
     const pending = pendingUploadRef.current;
     if (!file || !pending) return;
 
+    const comprobante = comprobantes.find((c) => c.id === pending.comprobanteId);
+    if (!comprobante) return;
+
     setUploadingKey(`${pending.comprobanteId}-${pending.tipo}`);
+
+    const newFileName = generateComprobanteFileName({
+      ruc: comprobante.numRuc,
+      serie: comprobante.numeroSerie,
+      numero: comprobante.numero,
+      fechaEmision: formatDate(comprobante.fechaEmision),
+      codigoAlfanumerico: comprobante.codigoAlfanumerico,
+      tipo: pending.tipo as 'factura' | 'xml' | 'guia' | 'ordenCompra',
+      originalName: file.name,
+    });
+    const renamedFile = new File([file], newFileName, { type: file.type });
+
     const formData = new FormData();
-    formData.append('file', file);
+    formData.append('file', renamedFile);
     formData.append('tipoArchivo', pending.tipo);
 
     try {
@@ -858,14 +874,14 @@ export default function ComprobantesPage() {
                                 <div key={file.label} className="flex items-center justify-between bg-muted rounded-md px-3 py-2">
                                   <div className="flex items-center gap-2 min-w-0">
                                     <span className={`text-xs font-semibold px-2 py-0.5 rounded ${getBadgeColor(file.tipo)}`}>{file.label}</span>
-                                    <a
-                                      href={`https://drive.google.com/file/d/${file.fileId}/view`}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="text-xs text-muted-foreground truncate hover:text-brand transition-colors"
+                                    <button
+                                      type="button"
+                                      onClick={(e) => { e.stopPropagation(); handleDownloadFile(comprobante.id, file.tipo, file.fileName); }}
+                                      className="text-xs text-muted-foreground truncate hover:text-brand transition-colors text-left cursor-pointer"
+                                      title="Descargar archivo"
                                     >
                                       {file.fileName}
-                                    </a>
+                                    </button>
                                   </div>
                                   <div className="flex items-center gap-0.5 shrink-0">
                                     <button
