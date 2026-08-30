@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { FileDropzone } from '@/components/upload/file-dropzone';
 import { ComprobanteFormSchema, type ComprobanteFormData } from '@/shared/schemas/comprobante.schema';
 import apiClient from '@/lib/api-client';
 import { toast } from 'sonner';
@@ -29,6 +30,46 @@ export function ComprobanteForm({ onSuccess }: ComprobanteFormProps) {
   });
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [extracting, setExtracting] = useState(false);
+  const [extracted, setExtracted] = useState(false);
+
+  const handleExtract = async (files: File[]) => {
+    const file = files[0];
+    if (!file) return;
+
+    setExtracting(true);
+    try {
+      const ocrFormData = new FormData();
+      ocrFormData.append('file', file);
+
+      // fetch() nativo, no axios: evita el bug de serialización de FormData con
+      // el bundler de este proyecto (ver comentarios en upload-section.tsx).
+      const res = await fetch(`${apiClient.defaults.baseURL}/api/ocr/extract`, {
+        method: 'POST',
+        credentials: 'include',
+        body: ocrFormData,
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body.message || `Error ${res.status}`);
+
+      const fields = body.data ?? {};
+      setFormData(prev => ({
+        ...prev,
+        numRuc: fields.numRuc ?? prev.numRuc,
+        codComp: fields.codComp ?? prev.codComp,
+        numeroSerie: fields.numeroSerie ?? prev.numeroSerie,
+        numero: fields.numero ?? prev.numero,
+        fechaEmision: fields.fechaEmision ?? prev.fechaEmision,
+        monto: fields.monto ?? prev.monto,
+      }));
+      setExtracted(true);
+      toast.success('Datos extraídos del PDF — revísalos antes de validar');
+    } catch (error: any) {
+      toast.error(error.message || 'No se pudo extraer datos del archivo');
+    } finally {
+      setExtracting(false);
+    }
+  };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -90,6 +131,16 @@ export function ComprobanteForm({ onSuccess }: ComprobanteFormProps) {
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-2">
+            <Label>Autocompletar desde PDF (opcional)</Label>
+            <FileDropzone
+              label={extracting ? 'Extrayendo datos...' : 'Autocompletar con OCR'}
+              accept={{ 'application/pdf': ['.pdf'] }}
+              onDrop={handleExtract}
+              uploaded={extracted}
+            />
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="numRuc">RUC</Label>
