@@ -9,6 +9,7 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { FileDropzone } from '@/components/upload/file-dropzone';
 import { ComprobanteFormSchema, type ComprobanteFormData } from '@/shared/schemas/comprobante.schema';
 import apiClient from '@/lib/api-client';
+import { useAuth } from '@/hooks/use-auth';
 import { toast } from 'sonner';
 
 interface ComprobanteFormProps {
@@ -16,6 +17,9 @@ interface ComprobanteFormProps {
 }
 
 export function ComprobanteForm({ onSuccess }: ComprobanteFormProps) {
+  const { user: currentUser } = useAuth();
+  const isAdmin = currentUser?.role === 'ADMIN';
+
   const [formData, setFormData] = useState<ComprobanteFormData>({
     numRuc: '',
     codComp: '01',
@@ -131,15 +135,17 @@ export function ComprobanteForm({ onSuccess }: ComprobanteFormProps) {
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
-            <Label>Autocompletar desde PDF (opcional)</Label>
-            <FileDropzone
-              label={extracting ? 'Extrayendo datos...' : 'Autocompletar con OCR'}
-              accept={{ 'application/pdf': ['.pdf'] }}
-              onDrop={handleExtract}
-              uploaded={extracted}
-            />
-          </div>
+          {isAdmin && (
+            <div className="space-y-2">
+              <Label>Autocompletar desde PDF (opcional)</Label>
+              <FileDropzone
+                label={extracting ? 'Extrayendo datos...' : 'Autocompletar con OCR'}
+                accept={{ 'application/pdf': ['.pdf'] }}
+                onDrop={handleExtract}
+                uploaded={extracted}
+              />
+            </div>
+          )}
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
