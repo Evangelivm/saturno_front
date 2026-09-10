@@ -38,6 +38,7 @@ export function ComprobanteForm({ onSuccess }: ComprobanteFormProps) {
   const [extracted, setExtracted] = useState(false);
 
   const handleExtract = async (files: File[]) => {
+    if (extracting) return;
     const file = files[0];
     if (!file) return;
 
@@ -143,6 +144,7 @@ export function ComprobanteForm({ onSuccess }: ComprobanteFormProps) {
                 accept={{ 'application/pdf': ['.pdf'] }}
                 onDrop={handleExtract}
                 uploaded={extracted}
+                loading={extracting}
               />
             </div>
           )}

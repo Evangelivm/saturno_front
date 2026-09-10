@@ -29,8 +29,15 @@ export function UploadSection({
     xml: false,
     guia: false,
   });
+  const [uploading, setUploading] = useState({
+    factura: false,
+    xml: false,
+    guia: false,
+  });
 
   const handleUpload = async (file: File, tipo: 'factura' | 'xml' | 'guia') => {
+    if (uploading[tipo]) return;
+
     const newFileName = generateComprobanteFileName({
       ruc, serie, numero, fechaEmision, codigoAlfanumerico, tipo, originalName: file.name,
     });
@@ -41,6 +48,7 @@ export function UploadSection({
     formData.append('file', renamedFile);
     formData.append('tipoArchivo', tipo);
 
+    setUploading(prev => ({ ...prev, [tipo]: true }));
     try {
       // axios (empaquetado por Next.js/Webpack en este proyecto) termina serializando
       // el FormData como JSON en vez de mandarlo como multipart — bug conocido de
@@ -67,6 +75,8 @@ export function UploadSection({
       }
     } catch (error: any) {
       toast.error(`Error al subir ${tipo}: ${error.message}`);
+    } finally {
+      setUploading(prev => ({ ...prev, [tipo]: false }));
     }
   };
 
@@ -81,24 +91,27 @@ export function UploadSection({
       <CardContent>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <FileDropzone
-            label="Factura (PDF)"
+            label={uploading.factura ? 'Subiendo...' : 'Factura (PDF)'}
             accept={{ 'application/pdf': ['.pdf'] }}
             onDrop={(files) => handleUpload(files[0], 'factura')}
             uploaded={uploads.factura}
+            loading={uploading.factura}
           />
 
           <FileDropzone
-            label="XML"
+            label={uploading.xml ? 'Subiendo...' : 'XML'}
             accept={{ 'application/xml': ['.xml'], 'text/xml': ['.xml'] }}
             onDrop={(files) => handleUpload(files[0], 'xml')}
             uploaded={uploads.xml}
+            loading={uploading.xml}
           />
 
           <FileDropzone
-            label="Guía (PDF)"
+            label={uploading.guia ? 'Subiendo...' : 'Guía (PDF)'}
             accept={{ 'application/pdf': ['.pdf'] }}
             onDrop={(files) => handleUpload(files[0], 'guia')}
             uploaded={uploads.guia}
+            loading={uploading.guia}
           />
         </div>
       </CardContent>
