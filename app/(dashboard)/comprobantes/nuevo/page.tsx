@@ -26,7 +26,7 @@ export default function NuevoComprobantePage() {
     <div className="p-3 sm:p-6">
       <div className="max-w-5xl mx-auto space-y-6 sm:space-y-8">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold mb-1 sm:mb-2">Nuevo Comprobante</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight mb-1 sm:mb-2">Nuevo Comprobante</h1>
           <p className="text-sm text-muted-foreground">
             Valida tu comprobante con SUNAT y sube los archivos correspondientes
           </p>

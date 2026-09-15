@@ -88,6 +88,20 @@ export function ComprobanteForm({ onSuccess }: ComprobanteFormProps) {
     }
   };
 
+  // Feedback inline: valida un campo apenas el usuario sale de él, en vez de
+  // esperar al submit. Reutiliza el schema completo (no hay reglas cruzadas
+  // entre campos hoy, pero así queda correcto si en el futuro las hay).
+  const handleBlur = (e: React.FocusEvent<HTMLInputElement>) => {
+    const { name } = e.target;
+    const result = ComprobanteFormSchema.safeParse(formData);
+    if (result.success) {
+      setErrors(prev => (prev[name] ? { ...prev, [name]: '' } : prev));
+      return;
+    }
+    const issue = result.error.issues.find((i) => i.path[0] === name);
+    setErrors(prev => ({ ...prev, [name]: issue?.message ?? '' }));
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrors({});
@@ -157,6 +171,8 @@ export function ComprobanteForm({ onSuccess }: ComprobanteFormProps) {
                 name="numRuc"
                 value={formData.numRuc}
                 onChange={handleChange}
+                onBlur={handleBlur}
+                error={!!errors.numRuc}
                 maxLength={11}
                 placeholder="20123456789"
               />
@@ -206,6 +222,8 @@ export function ComprobanteForm({ onSuccess }: ComprobanteFormProps) {
                 name="numeroSerie"
                 value={formData.numeroSerie}
                 onChange={handleChange}
+                onBlur={handleBlur}
+                error={!!errors.numeroSerie}
                 maxLength={4}
                 placeholder="F001"
               />
@@ -220,6 +238,8 @@ export function ComprobanteForm({ onSuccess }: ComprobanteFormProps) {
                 type="number"
                 value={formData.numero || ''}
                 onChange={handleChange}
+                onBlur={handleBlur}
+                error={!!errors.numero}
                 placeholder="1234"
               />
               {errors.numero && <p className="text-sm text-red-600">{errors.numero}</p>}
@@ -232,6 +252,8 @@ export function ComprobanteForm({ onSuccess }: ComprobanteFormProps) {
                 name="fechaEmision"
                 value={formData.fechaEmision}
                 onChange={handleChange}
+                onBlur={handleBlur}
+                error={!!errors.fechaEmision}
                 placeholder="DD/MM/YYYY"
               />
               {errors.fechaEmision && <p className="text-sm text-red-600">{errors.fechaEmision}</p>}
@@ -276,6 +298,8 @@ export function ComprobanteForm({ onSuccess }: ComprobanteFormProps) {
                 name="numeroOrden"
                 value={formData.numeroOrden}
                 onChange={handleChange}
+                onBlur={handleBlur}
+                error={!!errors.numeroOrden}
                 placeholder="OC-2025-001"
                 maxLength={50}
               />
@@ -291,6 +315,8 @@ export function ComprobanteForm({ onSuccess }: ComprobanteFormProps) {
                 step="0.01"
                 value={formData.monto || ''}
                 onChange={handleChange}
+                onBlur={handleBlur}
+                error={!!errors.monto}
                 placeholder="150.00"
               />
               {errors.monto && <p className="text-sm text-red-600">{errors.monto}</p>}

@@ -23,9 +23,9 @@ export function FileDropzone({ label, accept, onDrop, uploaded, loading = false 
     <div
       {...getRootProps()}
       className={`
-        border-2 border-dashed rounded-lg p-6 text-center transition-all duration-150
+        border-2 border-dashed rounded-lg p-6 text-center transition-all duration-200 ease-[var(--ease-spring)]
         ${loading ? 'cursor-wait opacity-80' : 'cursor-pointer'}
-        ${isDragActive ? 'border-brand bg-brand/5 scale-[1.02] shadow-md' : 'border-border bg-muted/40 hover:border-brand/50 hover:bg-brand/5'}
+        ${isDragActive ? 'border-brand bg-brand/5 scale-[1.03] shadow-md' : 'border-border bg-muted/40 hover:border-brand/50 hover:bg-brand/5'}
         ${uploaded ? 'border-success bg-success/5' : ''}
         ${loading ? 'border-brand bg-brand/5' : ''}
       `}

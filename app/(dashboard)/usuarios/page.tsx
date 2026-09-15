@@ -118,7 +118,7 @@ export default function UsuariosPage() {
   return (
     <div className="max-w-5xl mx-auto px-3 sm:px-4 py-5 sm:py-8">
       <div className="flex items-center justify-between mb-5 sm:mb-6">
-        <h1 className="text-xl sm:text-2xl font-bold">Usuarios</h1>
+        <h1 className="text-xl sm:text-2xl font-bold tracking-tight">Usuarios</h1>
         <Button onClick={() => router.push('/usuarios/nuevo')} className="flex items-center gap-2 h-8 sm:h-9 text-xs sm:text-sm px-3 sm:px-4">
           <UserPlus className="h-4 w-4" />
           <span>Nuevo Usuario</span>

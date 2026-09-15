@@ -158,9 +158,15 @@ export function Navbar() {
           </div>
         </div>
 
-        {/* Mobile navigation — colapsable */}
-        {mobileOpen && (
-          <div className="md:hidden pb-3 pt-1 space-y-1 border-t border-border mt-1">
+        {/* Mobile navigation — colapsable, animada con la técnica de grid-rows
+            (evita tener que medir la altura del contenido a mano) */}
+        <div
+          className={`md:hidden grid overflow-hidden transition-[grid-template-rows,opacity] duration-300 ease-[var(--ease-smooth)] ${
+            mobileOpen ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'
+          }`}
+          inert={!mobileOpen}
+        >
+          <div className="min-h-0 pb-3 pt-1 space-y-1 border-t border-border mt-1">
             {navLinks.map((link) => {
               const Icon = link.icon;
               const isActive = pathname === link.href || pathname.startsWith(link.href + '/');
@@ -232,7 +238,7 @@ export function Navbar() {
               </>
             )}
           </div>
-        )}
+        </div>
       </div>
     </nav>
   );

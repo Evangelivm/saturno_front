@@ -613,7 +613,7 @@ export default function ComprobantesPage() {
         {/* ── Header ── */}
         <div id="tour-header" className="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-start">
           <div>
-            <h1 className="text-2xl sm:text-3xl font-bold mb-1 sm:mb-2">Comprobantes</h1>
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight mb-1 sm:mb-2">Comprobantes</h1>
             <p className="text-sm text-muted-foreground">Gestiona y consulta todos tus comprobantes validados con SUNAT</p>
           </div>
           <div className="flex flex-wrap items-center gap-2 sm:gap-3 sm:shrink-0">
