@@ -8,16 +8,12 @@ import { useNuevoComprobanteTour } from '@/hooks/use-nuevo-comprobante-tour';
 import { HelpCircle } from 'lucide-react';
 
 export default function NuevoComprobantePage() {
-  const [comprobanteId, setComprobanteId] = useState<string | null>(null);
-  const [codigoAlfanumerico, setCodigoAlfanumerico] = useState<string | null>(null);
   const [showUploadSection, setShowUploadSection] = useState(false);
   const [formDataSaved, setFormDataSaved] = useState<ComprobanteFormData | null>(null);
 
   const { startTour } = useNuevoComprobanteTour(showUploadSection);
 
-  const handleSuccess = (id: string, codigo: string, formData: ComprobanteFormData) => {
-    setComprobanteId(id);
-    setCodigoAlfanumerico(codigo);
+  const handleValidated = (formData: ComprobanteFormData) => {
     setFormDataSaved(formData);
     setShowUploadSection(true);
   };
@@ -32,17 +28,10 @@ export default function NuevoComprobantePage() {
           </p>
         </div>
 
-        <ComprobanteForm onSuccess={handleSuccess} />
+        <ComprobanteForm onValidated={handleValidated} />
 
-        {showUploadSection && comprobanteId && codigoAlfanumerico && formDataSaved && (
-          <UploadSection
-            comprobanteId={comprobanteId}
-            codigoAlfanumerico={codigoAlfanumerico}
-            ruc={formDataSaved.numRuc}
-            serie={formDataSaved.numeroSerie}
-            numero={formDataSaved.numero}
-            fechaEmision={formDataSaved.fechaEmision}
-          />
+        {showUploadSection && formDataSaved && (
+          <UploadSection formData={formDataSaved} />
         )}
       </div>
 

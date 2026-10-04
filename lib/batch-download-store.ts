@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 
-export type BatchDownloadKind = 'range' | 'legacyBatch';
+export type BatchDownloadKind = 'range' | 'legacyBatch' | 'legacyBatchAvanzado';
 
 interface DownloadState {
   downloading: boolean;
@@ -14,6 +14,7 @@ const emptyState = (): DownloadState => ({ downloading: false, bytes: 0, totalBy
 interface BatchDownloadStore {
   range: DownloadState;
   legacyBatch: DownloadState;
+  legacyBatchAvanzado: DownloadState;
   start: (kind: BatchDownloadKind, controller: AbortController) => void;
   setBytes: (kind: BatchDownloadKind, bytes: number) => void;
   setTotalBytes: (kind: BatchDownloadKind, totalBytes: number) => void;
@@ -31,6 +32,7 @@ interface BatchDownloadStore {
 export const useBatchDownloadStore = create<BatchDownloadStore>((set) => ({
   range: emptyState(),
   legacyBatch: emptyState(),
+  legacyBatchAvanzado: emptyState(),
   start: (kind, controller) => set({ [kind]: { ...emptyState(), downloading: true, controller } }),
   setBytes: (kind, bytes) => set((s) => ({ [kind]: { ...s[kind], bytes } })),
   setTotalBytes: (kind, totalBytes) => set((s) => ({ [kind]: { ...s[kind], totalBytes } })),

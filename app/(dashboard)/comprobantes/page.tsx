@@ -60,8 +60,25 @@ interface Comprobante {
   ordenCompraFileName: string | null;
   contabilidadValidado: boolean;
   contabilidadValidadoAt: string | null;
+  pagoMedio?: string | null;
+  pagoFecha?: string | null;
+  pagoNumeroOperacion?: string | null;
+  pagoImporte?: number | string | null;
+  pagoConfirmadoAt?: string | null;
   user?: { ruc: string };
 }
+
+type PagoFilter = '' | 'pagado' | 'pendiente';
+
+const PAGO_FILTERS: { value: PagoFilter; label: string }[] = [
+  { value: '', label: 'Todos' },
+  { value: 'pagado', label: 'Pagados' },
+  { value: 'pendiente', label: 'Pendientes' },
+];
+
+const MEDIOS_PAGO = ['Transferencia', 'Depósito', 'Cheque', 'Efectivo', 'Yape', 'Plin'];
+
+const emptyPagoForm = { medioPago: '', fechaPago: '', numeroOperacion: '', importe: '' };
 
 interface LegacyRecord {
   id: number;
@@ -128,11 +145,16 @@ export default function ComprobantesPage() {
   const [revalidatingId, setRevalidatingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [validatingContabilidadId, setValidatingContabilidadId] = useState<string | null>(null);
+  const [pagoFilter, setPagoFilter] = useState<PagoFilter>('');
+  const [pagoFormId, setPagoFormId] = useState<string | null>(null);
+  const [pagoForm, setPagoForm] = useState(emptyPagoForm);
+  const [savingPagoId, setSavingPagoId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const rangeDownload = useBatchDownloadStore((s) => s.range);
   const legacyBatchDownload = useBatchDownloadStore((s) => s.legacyBatch);
+  const legacyBatchAvanzadoDownload = useBatchDownloadStore((s) => s.legacyBatchAvanzado);
   const startBatchDownload = useBatchDownloadStore((s) => s.start);
   const setBatchDownloadBytes = useBatchDownloadStore((s) => s.setBytes);
   const setBatchDownloadTotalBytes = useBatchDownloadStore((s) => s.setTotalBytes);
@@ -147,6 +169,7 @@ export default function ComprobantesPage() {
   const [batchSugerencias, setBatchSugerencias] = useState<{ ruc: string; nombre: string }[]>([]);
   const [batchShowSugerencias, setBatchShowSugerencias] = useState(false);
   const [includeLegacy, setIncludeLegacy] = useState(false);
+  const [advancedBatchAvailable, setAdvancedBatchAvailable] = useState(false);
 
   // reporte
   const [showReporteDialog, setShowReporteDialog] = useState(false);
@@ -189,7 +212,16 @@ export default function ComprobantesPage() {
     return () => clearTimeout(t);
   }, [searchTerm]);
 
-  useEffect(() => { fetchComprobantes(page, debouncedSearch); }, [page, debouncedSearch, sortBy, sortOrder]);
+  useEffect(() => { fetchComprobantes(page, debouncedSearch); }, [page, debouncedSearch, sortBy, sortOrder, pagoFilter]);
+
+  // La descarga de lote avanzada (rescate por OCR) solo existe cuando el backend
+  // local la tiene habilitada (ENABLE_ADVANCED_BATCH) — no en producción.
+  useEffect(() => {
+    if (!isAdmin) return;
+    apiClient.get('/api/reportes/legacy-batch-avanzado-disponible')
+      .then(({ data }) => setAdvancedBatchAvailable(!!data.disponible))
+      .catch(() => setAdvancedBatchAvailable(false));
+  }, [isAdmin]);
 
   useEffect(() => {
     if (!isAdmin) return;
@@ -216,6 +248,7 @@ export default function ComprobantesPage() {
     try {
       const params: Record<string, string> = { page: String(pageNum), limit: '30' };
       if (search) params.search = search;
+      if (pagoFilter) params.pago = pagoFilter;
       if (sortBy) { params.sortBy = sortBy; params.sortOrder = sortOrder; }
       const response = await apiClient.get('/api/comprobantes', { params, signal: abortRef.current.signal });
       const { data, totalPages: tp, stats: s } = response.data;
@@ -451,6 +484,51 @@ export default function ComprobantesPage() {
     }
   };
 
+  const isPagado = (c: Comprobante) => !!c.pagoConfirmadoAt;
+
+  // Fecha 'YYYY-MM-DD' sin pasar por new Date() para no correrse un día por zona horaria
+  const formatPagoFecha = (value?: string | null) => {
+    if (!value) return '—';
+    const [y, m, d] = value.slice(0, 10).split('-');
+    return `${d}/${m}/${y}`;
+  };
+
+  const openPagoForm = (c: Comprobante) => {
+    setPagoFormId(c.id);
+    setPagoForm({
+      medioPago: c.pagoMedio ?? '',
+      fechaPago: c.pagoFecha ? c.pagoFecha.slice(0, 10) : '',
+      numeroOperacion: c.pagoNumeroOperacion ?? '',
+      importe: c.pagoImporte != null ? String(c.pagoImporte) : c.monto != null ? String(c.monto) : '',
+    });
+  };
+
+  const handleConfirmarPago = async (comprobanteId: string) => {
+    const importe = parseFloat(pagoForm.importe);
+    if (!pagoForm.medioPago.trim()) return toast.error('Indica el medio de pago');
+    if (!pagoForm.fechaPago) return toast.error('Indica la fecha de pago');
+    if (!(importe > 0)) return toast.error('El importe debe ser mayor a 0');
+
+    setSavingPagoId(comprobanteId);
+    try {
+      const { data } = await apiClient.put(`/api/comprobantes/${comprobanteId}/pago`, {
+        medioPago: pagoForm.medioPago.trim(),
+        fechaPago: pagoForm.fechaPago,
+        numeroOperacion: pagoForm.numeroOperacion.trim() || null,
+        importe,
+      });
+      setComprobantes(prev => prev.map(c => c.id === comprobanteId ? { ...c, ...data } : c));
+      setPagoFormId(null);
+      toast.success('Pago confirmado');
+      // Si hay filtro pagado/pendiente, el registro puede haber cambiado de grupo
+      if (pagoFilter) fetchComprobantes(page, debouncedSearch);
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || 'Error al confirmar el pago');
+    } finally {
+      setSavingPagoId(null);
+    }
+  };
+
   const triggerDownload = (blob: Blob, fileName: string) => {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -586,6 +664,50 @@ export default function ComprobantesPage() {
     ? Math.min(100, Math.round((legacyBatchDownload.bytes / legacyBatchDownload.totalBytes) * 100))
     : null;
 
+  /**
+   * Igual que handleDownloadLegacyBatch, pero contra /legacy-batch-avanzado: los
+   * pedidos/guías que quedarían "ambiguos" (varias copias en Drive con el mismo
+   * nombre) se intentan rescatar leyendo su contenido con OCR. Mucho más lento
+   * (descarga + OCR de cada copia candidata) — solo disponible localmente.
+   */
+  const handleDownloadLegacyBatchAvanzado = async () => {
+    const controller = new AbortController();
+    startBatchDownload('legacyBatchAvanzado', controller);
+    const toastId = 'download-legacy-batch-avanzado';
+    const cancelAction = { label: 'Cancelar', onClick: () => controller.abort() };
+
+    toast.loading('Descargando y leyendo documentos con OCR... esto puede tardar varios minutos', {
+      id: toastId, duration: Infinity, action: cancelAction,
+    });
+
+    try {
+      const tiposLegacy = selectedTypes.map(t => t === 'ordenCompra' ? 'pedido' : t).join(',');
+      const params = { desde: dateFrom, hasta: dateTo, tipos: tiposLegacy, ...(selectedRuc ? { ruc: selectedRuc } : {}) };
+
+      const response = await apiClient.get('/api/reportes/legacy-batch-avanzado', {
+        params,
+        responseType: 'blob',
+        signal: controller.signal,
+        onDownloadProgress: (e) => {
+          setBatchDownloadBytes('legacyBatchAvanzado', e.loaded);
+          toast.loading(`Descargando... ${(e.loaded / 1024 / 1024).toFixed(1)} MB`, {
+            id: toastId, duration: Infinity, action: cancelAction,
+          });
+        },
+      });
+      triggerDownload(response.data, `historial-avanzado-${dateFrom}-a-${dateTo}.zip`);
+      toast.success('Descarga avanzada completa — revisa _rescatados_por_ocr.txt y _errores.txt dentro del zip', { id: toastId, duration: 8000 });
+    } catch (err) {
+      if (axios.isCancel(err)) {
+        toast.info('Descarga cancelada', { id: toastId, duration: 3000 });
+      } else {
+        toast.error('No se pudo completar la descarga avanzada', { id: toastId, duration: 5000 });
+      }
+    } finally {
+      finishBatchDownload('legacyBatchAvanzado');
+    }
+  };
+
   // ── Initial loading state (solo la primera vez) ────────────────────────────
   if (loading && !initialLoadDone.current) {
     return (
@@ -707,6 +829,23 @@ export default function ComprobantesPage() {
                 className="w-full pl-9 pr-3 py-2 text-sm border rounded-md bg-card focus:outline-none focus:ring-2 focus:ring-brand/20"
               />
             </div>
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Pago</span>
+              {PAGO_FILTERS.map((f) => (
+                <button
+                  key={f.value || 'todos'}
+                  type="button"
+                  onClick={() => { setPagoFilter(f.value); setPage(1); }}
+                  className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors cursor-pointer ${
+                    pagoFilter === f.value
+                      ? 'bg-brand text-white border-brand'
+                      : 'bg-card text-muted-foreground border-border hover:bg-muted'
+                  }`}
+                >
+                  {f.label}
+                </button>
+              ))}
+            </div>
           </CardContent>
         </Card>
 
@@ -771,7 +910,12 @@ export default function ComprobantesPage() {
                         {isAdmin && (
                           <span className="text-sm text-muted-foreground truncate" title={empresaNombre}>{empresaNombre}</span>
                         )}
-                        <span className={`px-2 py-0.5 rounded-full text-xs font-medium w-fit ${estado.color}`}>{estado.label}</span>
+                        <div className="flex flex-col items-start gap-1">
+                          <span className={`px-2 py-0.5 rounded-full text-xs font-medium w-fit ${estado.color}`}>{estado.label}</span>
+                          <span className={`px-2 py-0.5 rounded-full text-[11px] font-medium w-fit ${isPagado(comprobante) ? 'text-green-700 bg-green-50' : 'text-amber-700 bg-amber-50'}`}>
+                            {isPagado(comprobante) ? 'Pagado' : 'Pendiente'}
+                          </span>
+                        </div>
                         <span className="text-sm font-medium">{formatCurrency(comprobante.monto)}</span>
                         <span className="text-sm text-muted-foreground">{formatDate(comprobante.fechaEmision)}</span>
                         <div className="flex gap-1 flex-wrap">
@@ -790,6 +934,9 @@ export default function ComprobantesPage() {
                             <p className="font-medium text-sm truncate">{comprobante.numeroSerie}-{comprobante.numero}</p>
                             <div className="flex items-center gap-2 mt-0.5">
                               <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${estado.color}`}>{estado.label}</span>
+                              <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${isPagado(comprobante) ? 'text-green-700 bg-green-50' : 'text-amber-700 bg-amber-50'}`}>
+                                {isPagado(comprobante) ? 'Pagado' : 'Pendiente'}
+                              </span>
                               <span className="text-xs text-muted-foreground">{formatCurrency(comprobante.monto)}</span>
                               {isAdmin && empresaNombre !== '—' && (
                                 <span className="text-xs text-muted-foreground truncate">{empresaNombre}</span>
@@ -934,6 +1081,104 @@ export default function ComprobantesPage() {
                             </div>
                           </div>
                         </div>
+                        {/* ── Pago ── */}
+                        <div className="mt-4 pt-4 border-t" onClick={(e) => e.stopPropagation()}>
+                          <div className="flex items-center justify-between gap-3 flex-wrap mb-3">
+                            <div className="flex items-center gap-2">
+                              <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Pago</h4>
+                              <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${isPagado(comprobante) ? 'text-green-700 bg-green-50' : 'text-amber-700 bg-amber-50'}`}>
+                                {isPagado(comprobante) ? 'Pagado' : 'Pendiente'}
+                              </span>
+                            </div>
+                            {isAdmin && pagoFormId !== comprobante.id && (
+                              <button
+                                onClick={() => openPagoForm(comprobante)}
+                                className="flex items-center gap-1.5 text-xs font-medium text-success border border-success/30 rounded-md px-2.5 py-1 hover:bg-success/10 active:bg-success/20 transition-colors cursor-pointer"
+                              >
+                                <CheckCircle className="h-3.5 w-3.5" />
+                                {isPagado(comprobante) ? 'Editar pago' : 'Confirmar pago'}
+                              </button>
+                            )}
+                          </div>
+
+                          {isAdmin && pagoFormId === comprobante.id ? (
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 bg-muted rounded-md">
+                              <label className="space-y-1">
+                                <span className="text-xs text-muted-foreground">Medio de pago *</span>
+                                <input
+                                  list="medios-pago"
+                                  value={pagoForm.medioPago}
+                                  onChange={(e) => setPagoForm(f => ({ ...f, medioPago: e.target.value }))}
+                                  maxLength={50}
+                                  placeholder="Transferencia, Yape, Cheque..."
+                                  className="w-full px-3 py-2 text-sm border rounded-md bg-card focus:outline-none focus:ring-2 focus:ring-brand/20"
+                                />
+                                <datalist id="medios-pago">
+                                  {MEDIOS_PAGO.map(m => <option key={m} value={m} />)}
+                                </datalist>
+                              </label>
+                              <label className="space-y-1">
+                                <span className="text-xs text-muted-foreground">Fecha de pago *</span>
+                                <input
+                                  type="date"
+                                  value={pagoForm.fechaPago}
+                                  onChange={(e) => setPagoForm(f => ({ ...f, fechaPago: e.target.value }))}
+                                  className="w-full px-3 py-2 text-sm border rounded-md bg-card focus:outline-none focus:ring-2 focus:ring-brand/20"
+                                />
+                              </label>
+                              <label className="space-y-1">
+                                <span className="text-xs text-muted-foreground">N.º de operación (opcional)</span>
+                                <input
+                                  value={pagoForm.numeroOperacion}
+                                  onChange={(e) => setPagoForm(f => ({ ...f, numeroOperacion: e.target.value }))}
+                                  maxLength={50}
+                                  className="w-full px-3 py-2 text-sm border rounded-md bg-card focus:outline-none focus:ring-2 focus:ring-brand/20"
+                                />
+                              </label>
+                              <label className="space-y-1">
+                                <span className="text-xs text-muted-foreground">Importe *</span>
+                                <input
+                                  type="number"
+                                  min="0"
+                                  step="0.01"
+                                  value={pagoForm.importe}
+                                  onChange={(e) => setPagoForm(f => ({ ...f, importe: e.target.value }))}
+                                  className="w-full px-3 py-2 text-sm border rounded-md bg-card focus:outline-none focus:ring-2 focus:ring-brand/20"
+                                />
+                              </label>
+                              <div className="sm:col-span-2 flex justify-end gap-2">
+                                <Button variant="outline" size="sm" onClick={() => setPagoFormId(null)} disabled={savingPagoId === comprobante.id}>Cancelar</Button>
+                                <Button size="sm" onClick={() => handleConfirmarPago(comprobante.id)} disabled={savingPagoId === comprobante.id}>
+                                  {savingPagoId === comprobante.id ? 'Guardando...' : 'Guardar pago'}
+                                </Button>
+                              </div>
+                            </div>
+                          ) : isPagado(comprobante) ? (
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2">
+                              <div className="flex justify-between text-sm">
+                                <span className="text-muted-foreground">Medio de pago</span>
+                                <span className="font-medium">{comprobante.pagoMedio ?? '—'}</span>
+                              </div>
+                              <div className="flex justify-between text-sm">
+                                <span className="text-muted-foreground">Fecha de pago</span>
+                                <span className="font-medium">{formatPagoFecha(comprobante.pagoFecha)}</span>
+                              </div>
+                              <div className="flex justify-between text-sm">
+                                <span className="text-muted-foreground">Importe</span>
+                                <span className="font-medium">{formatCurrency(comprobante.pagoImporte != null ? Number(comprobante.pagoImporte) : null)}</span>
+                              </div>
+                              {isAdmin && comprobante.pagoNumeroOperacion && (
+                                <div className="flex justify-between text-sm">
+                                  <span className="text-muted-foreground">N.º de operación</span>
+                                  <span className="font-medium">{comprobante.pagoNumeroOperacion}</span>
+                                </div>
+                              )}
+                            </div>
+                          ) : (
+                            <p className="text-sm text-muted-foreground">Aún no se ha registrado el pago de este comprobante.</p>
+                          )}
+                        </div>
+
                         <div className="mt-4 pt-4 border-t flex items-center justify-between gap-3 flex-wrap">
                           <div className="flex items-center gap-2">
                             {comprobante.contabilidadValidado ? (
@@ -1342,6 +1587,28 @@ export default function ComprobantesPage() {
                 </div>
               )}
 
+              {legacyBatchAvanzadoDownload.downloading && (
+                <div className="mt-4 space-y-1">
+                  <div className="flex justify-between items-center text-xs text-purple-700 dark:text-purple-400">
+                    <span>Descargando y leyendo con OCR...</span>
+                    <span className="flex items-center gap-2">
+                      {(legacyBatchAvanzadoDownload.bytes / 1024 / 1024).toFixed(1)} MB
+                      <button
+                        type="button"
+                        onClick={() => legacyBatchAvanzadoDownload.controller?.abort()}
+                        className="text-purple-500 hover:text-red-500 transition-colors"
+                        title="Cancelar descarga"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    </span>
+                  </div>
+                  <div className="w-full h-1.5 bg-purple-100 dark:bg-purple-900/40 rounded-full overflow-hidden">
+                    <div className="h-full w-full rounded-full bg-purple-500" style={{ backgroundImage: 'linear-gradient(90deg, rgba(147,51,234,0.3) 0%, rgba(147,51,234,1) 50%, rgba(147,51,234,0.3) 100%)', backgroundSize: '200% 100%', animation: 'shimmer 1.5s ease-in-out infinite' }} />
+                  </div>
+                </div>
+              )}
+
               <div className={`flex flex-col-reverse gap-2 mt-6 ${includeLegacy ? '' : 'sm:flex-row sm:items-center sm:justify-end'}`}>
                 <Button
                   variant="outline"
@@ -1350,6 +1617,20 @@ export default function ComprobantesPage() {
                 >
                   Cancelar
                 </Button>
+                {includeLegacy && advancedBatchAvailable && (
+                  <Button
+                    variant="outline"
+                    disabled={!dateFrom || !dateTo || dateFrom > dateTo || selectedTypes.length === 0 || legacyBatchAvanzadoDownload.downloading}
+                    onClick={handleDownloadLegacyBatchAvanzado}
+                    className="w-full border-purple-400 text-purple-700 hover:bg-purple-50 dark:text-purple-400 dark:hover:bg-purple-950"
+                    title="Rescata por OCR los pedidos/guías ambiguos (varias copias con el mismo nombre). Solo local, mucho más lento."
+                  >
+                    {legacyBatchAvanzadoDownload.downloading
+                      ? <div className="h-4 w-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                      : <Download className="h-4 w-4" />}
+                    {legacyBatchAvanzadoDownload.downloading ? 'Descargando...' : 'Descarga de lote avanzado (.zip)'}
+                  </Button>
+                )}
                 {includeLegacy && (
                   <Button
                     variant="warning"

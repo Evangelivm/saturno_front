@@ -9,12 +9,14 @@ interface FileDropzoneProps {
   onDrop: (files: File[]) => void;
   uploaded: boolean;
   loading?: boolean;
+  maxFiles?: number;
 }
 
-export function FileDropzone({ label, accept, onDrop, uploaded, loading = false }: FileDropzoneProps) {
+export function FileDropzone({ label, accept, onDrop, uploaded, loading = false, maxFiles = 1 }: FileDropzoneProps) {
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     accept,
-    maxFiles: 1,
+    maxFiles,
+    multiple: maxFiles !== 1,
     onDrop,
     disabled: loading,
   });

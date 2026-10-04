@@ -1,119 +1,152 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { FileDropzone } from './file-dropzone';
+import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import apiClient from '@/lib/api-client';
-import { generateComprobanteFileName } from '@/lib/generate-comprobante-filename';
+import { type ComprobanteFormData } from '@/shared/schemas/comprobante.schema';
 import { toast } from 'sonner';
+import { X } from 'lucide-react';
 
 interface UploadSectionProps {
-  comprobanteId: string;
-  codigoAlfanumerico: string;
-  ruc: string;
-  serie: string;
-  numero: number;
-  fechaEmision: string; // DD/MM/YYYY
+  formData: ComprobanteFormData;
 }
 
-export function UploadSection({
-  comprobanteId,
-  codigoAlfanumerico,
-  ruc,
-  serie,
-  numero,
-  fechaEmision,
-}: UploadSectionProps) {
-  const [uploads, setUploads] = useState({
-    factura: false,
-    xml: false,
-    guia: false,
-  });
-  const [uploading, setUploading] = useState({
-    factura: false,
-    xml: false,
-    guia: false,
-  });
+const GUIA_ACCEPT = {
+  'application/pdf': ['.pdf'],
+  'image/jpeg': ['.jpg', '.jpeg'],
+  'image/png': ['.png'],
+};
 
-  const handleUpload = async (file: File, tipo: 'factura' | 'xml' | 'guia') => {
-    if (uploading[tipo]) return;
+const ORDEN_COMPRA_ACCEPT = {
+  'application/pdf': ['.pdf'],
+  'image/jpeg': ['.jpg', '.jpeg'],
+  'image/png': ['.png'],
+};
 
-    const newFileName = generateComprobanteFileName({
-      ruc, serie, numero, fechaEmision, codigoAlfanumerico, tipo, originalName: file.name,
-    });
+export function UploadSection({ formData }: UploadSectionProps) {
+  const router = useRouter();
+  const requiereGuia = formData.tipoFactura !== 'SERVICIO_SIN_GUIA';
 
-    // Crear FormData con el archivo renombrado
-    const formData = new FormData();
-    const renamedFile = new File([file], newFileName, { type: file.type });
-    formData.append('file', renamedFile);
-    formData.append('tipoArchivo', tipo);
+  const [factura, setFactura] = useState<File | null>(null);
+  const [xml, setXml] = useState<File | null>(null);
+  const [guia, setGuia] = useState<File[]>([]);
+  const [ordenCompra, setOrdenCompra] = useState<File | null>(null);
+  const [submitting, setSubmitting] = useState(false);
 
-    setUploading(prev => ({ ...prev, [tipo]: true }));
+  const removeGuiaFile = (index: number) => {
+    setGuia((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const allReady = !!factura && !!xml && !!ordenCompra && (!requiereGuia || guia.length > 0);
+
+  const handleSubmit = async () => {
+    if (!allReady || submitting) return;
+    setSubmitting(true);
+
     try {
-      // axios (empaquetado por Next.js/Webpack en este proyecto) termina serializando
-      // el FormData como JSON en vez de mandarlo como multipart — bug conocido de
-      // axios con ciertos bundlers. fetch() nativo nunca pasa por esa lógica: maneja
-      // el FormData directo, con el boundary correcto siempre.
-      const res = await fetch(
-        `${apiClient.defaults.baseURL}/api/comprobantes/${comprobanteId}/upload`,
-        {
-          method: 'POST',
-          credentials: 'include',
-          body: formData,
-        }
-      );
+      const body = new FormData();
+      body.append('data', JSON.stringify(formData));
+      body.append('factura', factura!);
+      body.append('xml', xml!);
+      guia.forEach((f) => body.append('guia', f));
+      body.append('ordenCompra', ordenCompra!);
+
+      // fetch() nativo, no axios: axios (empaquetado por Next.js/Webpack en este
+      // proyecto) termina serializando el FormData como JSON en vez de mandarlo
+      // como multipart — bug conocido de axios con ciertos bundlers.
+      const res = await fetch(`${apiClient.defaults.baseURL}/api/comprobantes`, {
+        method: 'POST',
+        credentials: 'include',
+        body,
+      });
 
       const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.message || `Error ${res.status}`);
 
-      if (!res.ok) {
-        throw new Error(data.message || `Error ${res.status}`);
+      if (data.success === true) {
+        toast.success('Comprobante registrado y validado con SUNAT');
+      } else if (data.success === false) {
+        toast.warning(data.message || 'Comprobante registrado, pero no se pudo validar con SUNAT');
+      } else {
+        toast.info(data.message || 'Comprobante registrado. Se validará cuando SUNAT esté disponible.');
       }
-
-      if (data.success) {
-        setUploads(prev => ({ ...prev, [tipo]: true }));
-        toast.success(`${tipo.toUpperCase()} subido correctamente`);
-      }
+      router.push('/comprobantes');
     } catch (error: any) {
-      toast.error(`Error al subir ${tipo}: ${error.message}`);
+      toast.error(error.message || 'Error al registrar el comprobante');
     } finally {
-      setUploading(prev => ({ ...prev, [tipo]: false }));
+      setSubmitting(false);
     }
   };
 
   return (
     <Card id="tour-upload">
       <CardHeader>
-        <CardTitle>Subir Archivos del Comprobante</CardTitle>
+        <CardTitle>Adjuntar Archivos del Comprobante</CardTitle>
         <p className="text-sm text-muted-foreground">
-          Arrastra y suelta los archivos en las zonas correspondientes
+          Los archivos son obligatorios y el comprobante recién se guarda cuando envías todo junto — así se evitan registros duplicados o incompletos.
         </p>
       </CardHeader>
-      <CardContent>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <CardContent className="space-y-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <FileDropzone
-            label={uploading.factura ? 'Subiendo...' : 'Factura (PDF)'}
+            label="Factura (PDF)"
             accept={{ 'application/pdf': ['.pdf'] }}
-            onDrop={(files) => handleUpload(files[0], 'factura')}
-            uploaded={uploads.factura}
-            loading={uploading.factura}
+            onDrop={(files) => setFactura(files[0])}
+            uploaded={!!factura}
           />
 
           <FileDropzone
-            label={uploading.xml ? 'Subiendo...' : 'XML'}
+            label="XML"
             accept={{ 'application/xml': ['.xml'], 'text/xml': ['.xml'] }}
-            onDrop={(files) => handleUpload(files[0], 'xml')}
-            uploaded={uploads.xml}
-            loading={uploading.xml}
+            onDrop={(files) => setXml(files[0])}
+            uploaded={!!xml}
           />
 
+          <div className="space-y-2">
+            {requiereGuia ? (
+              <FileDropzone
+                label={guia.length > 0 ? `Guía (${guia.length} archivo${guia.length > 1 ? 's' : ''})` : 'Guía (PDF o fotos — puedes subir varios)'}
+                accept={GUIA_ACCEPT}
+                maxFiles={10}
+                onDrop={(files) => setGuia((prev) => [...prev, ...files])}
+                uploaded={guia.length > 0}
+              />
+            ) : (
+              <div className="border-2 border-dashed rounded-lg p-6 text-center text-sm text-muted-foreground bg-muted/20">
+                No se requiere guía para &quot;Servicio (sin guía)&quot;
+              </div>
+            )}
+            {guia.length > 0 && (
+              <ul className="space-y-1">
+                {guia.map((f, i) => (
+                  <li key={`${f.name}-${i}`} className="flex items-center justify-between text-xs bg-muted/50 rounded px-2 py-1">
+                    <span className="truncate">{f.name}</span>
+                    <button type="button" onClick={() => removeGuiaFile(i)} className="text-muted-foreground hover:text-red-600 shrink-0 ml-2">
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+            {guia.length > 1 && (
+              <p className="text-xs text-muted-foreground">Se unirán en un solo PDF al registrar el comprobante.</p>
+            )}
+          </div>
+
           <FileDropzone
-            label={uploading.guia ? 'Subiendo...' : 'Guía (PDF)'}
-            accept={{ 'application/pdf': ['.pdf'] }}
-            onDrop={(files) => handleUpload(files[0], 'guia')}
-            uploaded={uploads.guia}
-            loading={uploading.guia}
+            label="Orden de Compra"
+            accept={ORDEN_COMPRA_ACCEPT}
+            onDrop={(files) => setOrdenCompra(files[0])}
+            uploaded={!!ordenCompra}
           />
         </div>
+
+        <Button onClick={handleSubmit} disabled={!allReady || submitting} size="lg" className="w-full">
+          {submitting ? 'Registrando...' : 'Registrar Comprobante'}
+        </Button>
       </CardContent>
     </Card>
   );

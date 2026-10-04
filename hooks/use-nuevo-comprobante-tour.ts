@@ -2,7 +2,10 @@
 
 import { useEffect, useCallback } from 'react';
 
-const TOUR_KEY = 'nuevo_comprobante_tour_done';
+// v3: el registro ahora es atómico (se guarda solo al enviar los 4 archivos
+// juntos, incluida orden de compra) — cambiar la key fuerza a que quien ya
+// vio versiones anteriores vea el tour de nuevo y no se pierda el cambio.
+const TOUR_KEY = 'nuevo_comprobante_tour_done_v3';
 
 export function useNuevoComprobanteTour(showUploadSection: boolean) {
   const startTour = useCallback(async () => {
@@ -14,8 +17,8 @@ export function useNuevoComprobanteTour(showUploadSection: boolean) {
           {
             element: '#tour-upload',
             popover: {
-              title: '📎 Subir archivos',
-              description: '¡Comprobante validado! Ahora arrastra o selecciona los archivos: la <b>Factura PDF</b>, el <b>XML</b> firmado y la <b>Guía de remisión</b> (si aplica). Cada zona acepta solo el tipo de archivo correcto.',
+              title: '📎 Adjuntar archivos',
+              description: 'Ahora adjunta la <b>Factura PDF</b>, el <b>XML</b>, la <b>Guía de remisión</b> (puedes subir varias fotos o PDFs sueltos, se unen en uno solo) y la <b>Orden de Compra</b>. El comprobante recién se registra cuando envías todo junto — así se evitan registros duplicados o a medio subir.',
               side: 'top',
               align: 'start',
             },
@@ -42,6 +45,15 @@ export function useNuevoComprobanteTour(showUploadSection: boolean) {
           popover: {
             title: '📝 Registrar un comprobante',
             description: 'Completa este formulario con los datos del comprobante. El sistema lo validará automáticamente con SUNAT antes de guardarlo.',
+            side: 'bottom',
+            align: 'start',
+          },
+        },
+        {
+          element: '#tour-ocr',
+          popover: {
+            title: '🤖 Autocompletar con OCR',
+            description: 'Novedad: arrastra o selecciona el <b>PDF de la factura</b> acá y el sistema completa el formulario por vos automáticamente. Siempre revisa los datos extraídos antes de validar — es opcional, también podés llenarlo a mano.',
             side: 'bottom',
             align: 'start',
           },

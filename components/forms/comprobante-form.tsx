@@ -9,17 +9,13 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { FileDropzone } from '@/components/upload/file-dropzone';
 import { ComprobanteFormSchema, type ComprobanteFormData } from '@/shared/schemas/comprobante.schema';
 import apiClient from '@/lib/api-client';
-import { useAuth } from '@/hooks/use-auth';
 import { toast } from 'sonner';
 
 interface ComprobanteFormProps {
-  onSuccess: (comprobanteId: string, codigo: string, formData: ComprobanteFormData) => void;
+  onValidated: (formData: ComprobanteFormData) => void;
 }
 
-export function ComprobanteForm({ onSuccess }: ComprobanteFormProps) {
-  const { user: currentUser } = useAuth();
-  const isAdmin = currentUser?.role === 'ADMIN';
-
+export function ComprobanteForm({ onValidated }: ComprobanteFormProps) {
   const [formData, setFormData] = useState<ComprobanteFormData>({
     numRuc: '',
     codComp: '01',
@@ -111,20 +107,23 @@ export function ComprobanteForm({ onSuccess }: ComprobanteFormProps) {
       // Validar con Zod
       const validatedData = ComprobanteFormSchema.parse(formData);
 
-      // Enviar al backend
-      const response = await apiClient.post('/api/comprobantes', validatedData);
+      // Solo verifica en SUNAT — todavía no se guarda nada. El registro recién
+      // se crea cuando el usuario adjunta los 4 archivos (ver UploadSection).
+      const response = await apiClient.post('/api/comprobantes/validar-sunat', validatedData);
 
-      // El comprobante siempre queda registrado aunque la validación con SUNAT
-      // falle o quede pendiente (ver comprobantes.service.ts) — "success" solo
-      // describe el resultado de esa validación, no si se guardó o no.
-      if (response.data.success === true) {
-        toast.success('Comprobante validado exitosamente');
-      } else if (response.data.success === false) {
-        toast.warning(response.data.message || 'Comprobante registrado, pero no se pudo validar con SUNAT');
-      } else {
-        toast.info(response.data.message || 'Comprobante registrado. Se validará cuando SUNAT esté disponible.');
+      if (response.data.duplicate) {
+        toast.error(response.data.message || 'Este comprobante ya fue registrado anteriormente');
+        return;
       }
-      onSuccess(response.data.data.id, response.data.data.codigoAlfanumerico, validatedData);
+
+      if (response.data.success === true) {
+        toast.success('Comprobante validado con SUNAT. Ahora adjunta los archivos.');
+      } else if (response.data.success === false) {
+        toast.warning(response.data.message || 'No se pudo validar con SUNAT. Puedes continuar y adjuntar los archivos igual.');
+      } else {
+        toast.info(response.data.message || 'SUNAT no está disponible. Puedes continuar y adjuntar los archivos igual.');
+      }
+      onValidated(validatedData);
     } catch (error: any) {
       if (error.errors) {
         // Errores de validación de Zod
@@ -150,18 +149,16 @@ export function ComprobanteForm({ onSuccess }: ComprobanteFormProps) {
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-4">
-          {isAdmin && (
-            <div className="space-y-2">
-              <Label>Autocompletar desde PDF (opcional)</Label>
-              <FileDropzone
-                label={extracting ? 'Extrayendo datos...' : 'Autocompletar con OCR'}
-                accept={{ 'application/pdf': ['.pdf'] }}
-                onDrop={handleExtract}
-                uploaded={extracted}
-                loading={extracting}
-              />
-            </div>
-          )}
+          <div id="tour-ocr" className="space-y-2">
+            <Label>Autocompletar desde PDF (opcional)</Label>
+            <FileDropzone
+              label={extracting ? 'Extrayendo datos...' : 'Autocompletar con OCR'}
+              accept={{ 'application/pdf': ['.pdf'] }}
+              onDrop={handleExtract}
+              uploaded={extracted}
+              loading={extracting}
+            />
+          </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
